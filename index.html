@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#F26B1D">
+  <title>Chefi · Menú digital</title>
+  <link rel="stylesheet" href="css/estilos.css">
+  <script type="module" src="https://cdn.jsdelivr.net/npm/@google/model-viewer@3.5.0/dist/model-viewer.min.js"></script>
+  <script type="module" src="js/app.js"></script>
+</head>
+<body>
+  <!--
+    Diego: el diseño es tuyo. Cambia libremente el HTML de cada pantalla y todo css/estilos.css.
+    Solo conserva los atributos data-* (data-pantalla, data-ref, data-accion, data-lista, data-plantilla):
+    son los "ganchos" con los que js/app.js llena los datos y responde a los toques.
+    La lista completa está en README.md.
+  -->
+
+  <header class="barra-superior">
+    <button class="boton-icono" data-accion="atras" aria-label="Regresar">‹</button>
+    <span class="marca">Chefi</span>
+    <span class="mesa" data-ref="mesa"></span>
+  </header>
+
+  <main>
+    <!-- 1. Bienvenida: es lo primero que se ve al acercar el celular a la tarjeta NFC -->
+    <section class="pantalla" data-pantalla="bienvenida">
+      <h1>Bienvenido a Chefi</h1>
+      <p>Explora el menú, mira tu platillo sobre la mesa antes de pedirlo y paga desde aquí.</p>
+      <button class="boton-principal" data-accion="ir" data-destino="menu">Ver menú</button>
+    </section>
+
+    <!-- 2. Menú: categorías y platillos -->
+    <section class="pantalla" data-pantalla="menu">
+      <nav class="categorias" data-lista="categorias"></nav>
+      <div class="lista-platillos" data-lista="platillos"></div>
+    </section>
+
+    <!-- 3. Detalle del platillo + experiencia inmersiva -->
+    <section class="pantalla" data-pantalla="detalle">
+      <div class="contenedor-visor" data-ref="visor"></div>
+
+      <!-- Función extra: abre la cámara y pone el platillo a escala real sobre la mesa -->
+      <button class="boton-ar" data-accion="ver-en-mi-mesa">Ver en mi mesa</button>
+      <p class="aviso-ar" data-ref="aviso-ar" hidden>Abre este menú en tu celular para ver el platillo sobre tu mesa.</p>
+
+      <h2 data-ref="nombre"></h2>
+      <p class="precio" data-ref="precio"></p>
+      <p data-ref="descripcion"></p>
+
+      <dl class="nutricion">
+        <div><dt>Porción</dt><dd data-ref="porcion"></dd></div>
+        <div><dt>Calorías</dt><dd data-ref="kcal"></dd></div>
+        <div><dt>Carbohidratos</dt><dd data-ref="carbohidratos"></dd></div>
+        <div><dt>Carne</dt><dd data-ref="carne"></dd></div>
+      </dl>
+      <p class="nota">Valores aproximados de una porción de referencia.</p>
+
+      <label class="campo">Notas para cocina
+        <input type="text" data-ref="notas" placeholder="Ej. sin cebolla">
+      </label>
+
+      <div class="cantidad">
+        <button class="boton-icono" data-accion="menos" aria-label="Quitar uno">−</button>
+        <span data-ref="cantidad">1</span>
+        <button class="boton-icono" data-accion="mas" aria-label="Agregar uno">+</button>
+      </div>
+      <button class="boton-principal" data-accion="agregar">Agregar al pedido</button>
+    </section>
+
+    <!-- 4. Pedido (carrito) -->
+    <section class="pantalla" data-pantalla="pedido">
+      <h2>Tu pedido</h2>
+      <div data-lista="pedido"></div>
+      <p class="vacio" data-ref="pedido-vacio">Aún no agregas platillos.</p>
+      <p class="total">Total: <strong data-ref="total-pedido"></strong></p>
+      <button class="boton-principal" data-accion="enviar-pedido">Enviar a cocina</button>
+    </section>
+
+    <!-- 5. Estado del pedido -->
+    <section class="pantalla" data-pantalla="estado">
+      <h2>¡Pedido enviado!</h2>
+      <p data-ref="estado-texto">Tu pedido llegó a cocina.</p>
+      <div data-lista="enviados"></div>
+      <button class="boton-secundario" data-accion="ir" data-destino="menu">Pedir algo más</button>
+      <button class="boton-principal" data-accion="ir" data-destino="cuenta">Pedir la cuenta</button>
+    </section>
+
+    <!-- 6. Cuenta: dividir y propina -->
+    <section class="pantalla" data-pantalla="cuenta">
+      <h2>Cuenta clara</h2>
+      <div data-lista="cuenta"></div>
+      <p>Subtotal: <strong data-ref="subtotal"></strong></p>
+
+      <p>Propina</p>
+      <div class="opciones" data-lista="propinas"></div>
+
+      <p>Dividir entre</p>
+      <div class="cantidad">
+        <button class="boton-icono" data-accion="menos-personas" aria-label="Menos personas">−</button>
+        <span data-ref="personas">1</span>
+        <button class="boton-icono" data-accion="mas-personas" aria-label="Más personas">+</button>
+      </div>
+
+      <p class="total">Total: <strong data-ref="total-cuenta"></strong></p>
+      <p class="por-persona" data-ref="por-persona"></p>
+      <button class="boton-principal" data-accion="ir" data-destino="pago">Pagar</button>
+    </section>
+
+    <!-- 7. Pago (simulado: no se cobra nada) -->
+    <section class="pantalla" data-pantalla="pago">
+      <h2>¿Cómo quieres pagar?</h2>
+      <p>A pagar: <strong data-ref="a-pagar"></strong></p>
+      <div class="opciones-columna">
+        <label><input type="radio" name="metodo" value="tarjeta" checked> Tarjeta en la mesa (terminal)</label>
+        <label><input type="radio" name="metodo" value="efectivo"> Efectivo</label>
+        <label><input type="radio" name="metodo" value="en-linea"> Pago en línea</label>
+      </div>
+      <button class="boton-principal" data-accion="pagar">Confirmar pago</button>
+      <p class="nota">Prototipo escolar: el pago es una simulación.</p>
+    </section>
+
+    <!-- 8. Gracias + encuesta -->
+    <section class="pantalla" data-pantalla="gracias">
+      <h2>¡Gracias por tu visita!</h2>
+      <p data-ref="metodo-elegido"></p>
+      <p>¿Qué tanto te ayudó ver el platillo en tu mesa antes de pedirlo?</p>
+      <div class="opciones" data-lista="encuesta"></div>
+      <p data-ref="encuesta-gracias" hidden>¡Gracias por tu respuesta!</p>
+    </section>
+  </main>
+
+  <!-- Barra inferior con el pedido en curso -->
+  <button class="barra-pedido" data-accion="ir" data-destino="pedido" data-ref="barra-pedido" hidden>
+    Ver pedido · <span data-ref="barra-cantidad"></span> · <span data-ref="barra-total"></span>
+  </button>
+
+  <!-- Plantillas que app.js copia para cada elemento de una lista -->
+  <template data-plantilla="categoria">
+    <button class="chip" data-accion="categoria"></button>
+  </template>
+
+  <template data-plantilla="tarjeta-platillo">
+    <article class="tarjeta" data-accion="abrir-platillo">
+      <img data-ref="foto" alt="">
+      <div>
+        <h3 data-ref="nombre"></h3>
+        <p data-ref="descripcion"></p>
+        <p class="precio" data-ref="precio"></p>
+        <span class="etiqueta-ar" data-ref="etiqueta-ar">Ver en mi mesa</span>
+      </div>
+    </article>
+  </template>
+
+  <template data-plantilla="linea-pedido">
+    <div class="linea">
+      <span data-ref="cantidad"></span>
+      <span class="linea-nombre"><span data-ref="nombre"></span><small data-ref="notas"></small></span>
+      <span data-ref="importe"></span>
+      <button class="boton-icono" data-accion="quitar" aria-label="Quitar">×</button>
+    </div>
+  </template>
+
+  <template data-plantilla="opcion">
+    <button class="chip" data-accion="opcion"></button>
+  </template>
+</body>
+</html>
