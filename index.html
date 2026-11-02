@@ -3,13 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#F26B1D">
-  <meta name="description" content="Chefi · Menú digital: mira tu platillo en 3D sobre tu mesa antes de pedirlo, pide y divide la cuenta desde tu celular.">
+  <meta name="theme-color" content="#F5F0E6">
+  <meta name="description" content="Chefi · Menú digital: mira tu platillo en 3D sobre tu mesa antes de pedirlo, pide y paga todo desde tu celular.">
   <title>Chefi · Menú digital</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;900&family=Inter+Tight:wght@400;500;600;700;800&display=swap">
+  <link rel="icon" href="img/icono.svg" type="image/svg+xml">
   <link rel="stylesheet" href="css/estilos.css">
+  <link rel="preload" href="media/intro_chefi.mp4" as="video" type="video/mp4">
   <script type="module" src="https://cdn.jsdelivr.net/npm/@google/model-viewer@3.5.0/dist/model-viewer.min.js"></script>
   <script type="module" src="js/app.js"></script>
 </head>
@@ -19,9 +21,31 @@
     son los "ganchos" con los que js/app.js llena los datos y responde a los toques. Ver README.md.
   -->
 
+  <!-- Fondo con profundidad (paralaje con scroll e inclinación) -->
+  <div class="fondo" data-ref="fondo" aria-hidden="true">
+    <div class="mancha m1"></div><div class="mancha m2"></div><div class="mancha m3"></div>
+    <div class="piso"></div>
+    <div class="particulas"></div>
+  </div>
+
+  <!-- Intro: toca para entrar → logo reveal con sonido -->
+  <div class="intro" data-ref="intro">
+    <video src="media/intro_chefi.mp4" playsinline preload="auto" muted></video>
+    <button class="intro-tocar" data-accion-intro="entrar">
+      <span class="intro-ondas" aria-hidden="true"><i></i><i></i><i></i><b></b></span>
+      <span class="intro-mesa" data-ref="intro-mesa">Bienvenido</span>
+      <strong>Toca para entrar</strong>
+      <small>🔊 Sube el volumen</small>
+    </button>
+    <button class="intro-saltar" data-accion-intro="saltar">Saltar</button>
+  </div>
+
   <header class="barra-superior">
     <button class="boton-icono" data-accion="atras" aria-label="Regresar">‹</button>
-    <span class="marca">Chefi<small>burgers · pasta · grill</small></span>
+    <span class="logo" aria-label="Chefi">
+      <svg viewBox="-100 -100 200 200" aria-hidden="true"><path d="M52 47A70 70 0 1 1 52-47" fill="none" stroke="currentColor" stroke-width="30" stroke-linecap="round"/><circle cx="70" cy="0" r="19" fill="#1FA35B"/></svg>
+      <span class="logo-nombre">chef<span class="logo-i">ı</span></span>
+    </span>
     <span class="mesa" data-ref="mesa"></span>
   </header>
 
@@ -29,68 +53,123 @@
     <!-- 1. Bienvenida: es lo primero que se ve al acercar el celular a la tarjeta NFC -->
     <section class="pantalla" data-pantalla="bienvenida">
       <div class="heroe">
-        <p class="heroe-saludo">Bienvenido a la mesa</p>
-        <h1 class="heroe-titulo"><span>Míralo</span> <span class="contorno">antes</span> <span>de pedirlo</span></h1>
+        <p class="heroe-saludo" data-ref="saludo">Bienvenido a la mesa</p>
+        <h1 class="heroe-titulo" aria-live="polite">
+          <span class="heroe-frase" data-ref="frase-heroe">El menú se digitaliza.</span>
+        </h1>
+        <div class="heroe-puntos" data-lista="puntos-heroe" aria-hidden="true"></div>
         <div class="heroe-plato">
           <img src="img/hero_hamburguesa.webp" alt="Hamburguesa con papas de Chefi" width="760" height="544">
+          <span class="heroe-sombra" aria-hidden="true"></span>
           <svg class="sello-giratorio" viewBox="0 0 120 120" aria-hidden="true">
             <defs><path id="circulo" d="M60 60m-46 0a46 46 0 1 1 92 0a46 46 0 1 1-92 0"/></defs>
             <circle cx="60" cy="60" r="58" />
-            <text><textPath href="#circulo" textLength="286" lengthAdjust="spacingAndGlyphs">VER EN TU MESA ★ 3D ★ RA ★ </textPath></text>
+            <text><textPath href="#circulo" textLength="286" lengthAdjust="spacingAndGlyphs">MÍRALO EN TU MESA ● 3D ● RA ● </textPath></text>
           </svg>
         </div>
-        <button class="boton-principal boton-heroe" data-accion="ir" data-destino="menu">Ver el menú <span aria-hidden="true">→</span></button>
       </div>
 
       <div class="cinta" aria-hidden="true">
-        <div><span>Hamburguesas</span><span>★</span><span>Pastas</span><span>★</span><span>Ensaladas</span><span>★</span><span>Postres</span><span>★</span><span>Hamburguesas</span><span>★</span><span>Pastas</span><span>★</span><span>Ensaladas</span><span>★</span><span>Postres</span><span>★</span></div>
+        <div><span>Hamburguesas</span><span>●</span><span>Pastas</span><span>●</span><span>Ensaladas</span><span>●</span><span>Postres</span><span>●</span><span>Hamburguesas</span><span>●</span><span>Pastas</span><span>●</span><span>Ensaladas</span><span>●</span><span>Postres</span><span>●</span></div>
       </div>
 
       <h2 class="titulo-seccion">Así funciona</h2>
       <ol class="pasos">
         <li class="paso">
-          <svg class="grafico g-elige" viewBox="0 0 120 120" aria-hidden="true">
-            <rect class="tel" x="34" y="10" width="52" height="100" rx="10"/>
-            <rect class="fila" x="42" y="26" width="36" height="16" rx="4"/>
-            <rect class="fila fila-activa" x="42" y="48" width="36" height="16" rx="4"/>
-            <rect class="fila" x="42" y="70" width="36" height="16" rx="4"/>
-            <circle class="dedo" cx="72" cy="58" r="9"/>
+          <svg class="grafico g-nfc" viewBox="0 0 120 120" aria-hidden="true">
+            <rect class="mesa-t" x="10" y="92" width="100" height="10" rx="4"/>
+            <rect class="tarjeta" x="34" y="78" width="52" height="16" rx="4"/><text class="tarjeta-t" x="60" y="89.5">NFC</text>
+            <path class="onda o1" d="M46 70q14-9 28 0"/><path class="onda o2" d="M40 62q20-13 40 0"/>
+            <g class="tel"><rect x="38" y="8" width="44" height="54" rx="8"/><rect class="pantalla-t" x="43" y="14" width="34" height="42" rx="4"/>
+              <rect class="renglon-t r1" x="47" y="20" width="26" height="6" rx="3"/><rect class="renglon-t r2" x="47" y="30" width="20" height="6" rx="3"/><rect class="renglon-t r3" x="47" y="40" width="24" height="6" rx="3"/></g>
           </svg>
-          <div><b>1</b><h3>Elige tu platillo</h3><p>Explora el menú y gíralo en 3D.</p></div>
+          <div><b>1</b><h3>Acerca tu celular</h3><p>Toca la tarjeta de la mesa y el menú aparece en tu pantalla.</p></div>
+        </li>
+        <li class="paso">
+          <svg class="grafico g-elige" viewBox="0 0 120 120" aria-hidden="true">
+            <rect class="tel-e" x="30" y="6" width="60" height="108" rx="12"/>
+            <g class="fila f1"><circle cx="46" cy="30" r="8"/><rect x="58" y="26" width="24" height="8" rx="4"/></g>
+            <g class="fila f2"><rect class="fila-fondo" x="36" y="46" width="48" height="26" rx="8"/><g class="burger"><path class="pan" d="M38 58a8 6 0 0 1 16 0z"/><rect class="carne" x="38" y="59" width="16" height="3" rx="1.5"/><path class="pan" d="M38 63h16a3 3 0 0 1-3 3h-10a3 3 0 0 1-3-3z"/></g><rect class="txt" x="58" y="54" width="22" height="8" rx="4"/></g>
+            <g class="fila f3"><circle cx="46" cy="90" r="8"/><rect x="58" y="86" width="24" height="8" rx="4"/></g>
+            <circle class="dedo" cx="70" cy="60" r="9"/>
+          </svg>
+          <div><b>2</b><h3>Elige tu platillo</h3><p>Ábrelo y gíralo en 3D para verlo por todos lados.</p></div>
         </li>
         <li class="paso">
           <svg class="grafico g-mesa" viewBox="0 0 120 120" aria-hidden="true">
-            <ellipse class="mesa-sup" cx="60" cy="88" rx="50" ry="14"/>
-            <ellipse class="sombra" cx="60" cy="88" rx="24" ry="5"/>
-            <g class="plato"><ellipse cx="60" cy="80" rx="26" ry="7"/><path d="M42 78c0-12 8-20 18-20s18 8 18 20z"/></g>
-            <path class="marco" d="M18 18h14M18 18v14M102 18H88M102 18v14"/>
+            <path class="mesa-p" d="M8 104 30 70h60l22 34z"/>
+            <ellipse class="sombra" cx="60" cy="86" rx="24" ry="6"/>
+            <g class="plato"><ellipse class="plato-e" cx="60" cy="82" rx="26" ry="8"/><path class="pan" d="M46 78a14 10 0 0 1 28 0z"/><rect class="carne" x="46" y="78" width="28" height="4" rx="2"/></g>
+            <path class="marco" d="M14 14h12M14 14v12M106 14H94M106 14v12M14 60V48M14 60h12M106 60V48M106 60H94"/>
+            <g class="regla"><path d="M34 98h52"/><path d="M34 95v6M86 95v6"/><text x="60" y="114">27 cm</text></g>
           </svg>
-          <div><b>2</b><h3>Míralo en tu mesa</h3><p>Toca «Ver en mi mesa» y apunta la cámara.</p></div>
+          <div><b>3</b><h3>Míralo en tu mesa</h3><p>La cámara lo pone a tamaño real sobre tu mesa.</p></div>
         </li>
         <li class="paso">
           <svg class="grafico g-pide" viewBox="0 0 120 120" aria-hidden="true">
-            <g class="ticket"><path d="M36 30h48v66l-6-4-6 4-6-4-6 4-6-4-6 4-6-4-6 4z"/><path class="renglon" d="M44 44h32M44 54h24M44 64h28"/></g>
-            <rect class="impresora" x="26" y="22" width="68" height="14" rx="5"/>
-            <circle class="ok" cx="84" cy="84" r="13"/><path class="ok-palomita" d="M78 84l4 4 8-8"/>
+            <g class="gorro"><path d="M78 40a10 10 0 0 1 4-19 12 12 0 0 1 22 0 10 10 0 0 1 4 19z"/><rect x="82" y="40" width="22" height="9" rx="2"/></g>
+            <g class="ticket"><path d="M14 52h34v40l-5-3-6 3-6-3-6 3-6-3-5 3z"/><path class="renglon" d="M20 62h22M20 70h16M20 78h20"/></g>
+            <g class="boton-p"><rect x="12" y="98" width="38" height="14" rx="7"/><text x="31" y="108">Pedir</text></g>
+            <path class="trayecto" d="M38 54C56 20 72 20 88 36"/>
           </svg>
-          <div><b>3</b><h3>Pide tus alimentos</h3><p>Agrega notas o alergias y manda tu pedido.</p></div>
+          <div><b>4</b><h3>Pídelo</h3><p>Agrega alergias o notas y tu pedido llega directo a cocina.</p></div>
         </li>
         <li class="paso">
           <svg class="grafico g-paga" viewBox="0 0 120 120" aria-hidden="true">
-            <rect class="tarjeta-nfc" x="20" y="44" width="46" height="32" rx="6"/>
-            <path class="onda o1" d="M74 50a14 14 0 0 1 0 20"/>
-            <path class="onda o2" d="M80 44a22 22 0 0 1 0 32"/>
-            <circle class="amigo a1" cx="96" cy="30" r="9"/>
-            <circle class="amigo a2" cx="100" cy="60" r="9"/>
-            <circle class="amigo a3" cx="96" cy="90" r="9"/>
+            <g class="cuenta-g"><path d="M42 10h36v44l-6-4-6 4-6-4-6 4-6-4-6 4z"/><path class="renglon" d="M48 20h24M48 28h18M48 36h22"/></g>
+            <g class="parte p1"><rect x="10" y="66" width="24" height="16" rx="4"/></g>
+            <g class="parte p2"><rect x="48" y="66" width="24" height="16" rx="4"/></g>
+            <g class="parte p3"><rect x="86" y="66" width="24" height="16" rx="4"/></g>
+            <circle class="amigo a1" cx="22" cy="102" r="10"/><circle class="amigo a2" cx="60" cy="102" r="10"/><circle class="amigo a3" cx="98" cy="102" r="10"/>
+            <path class="palomita k1" d="M17 102l4 4 7-7"/><path class="palomita k2" d="M55 102l4 4 7-7"/><path class="palomita k3" d="M93 102l4 4 7-7"/>
           </svg>
-          <div><b>4</b><h3>Divide la cuenta y paga</h3><p>Elige la propina y que cada quien pague su parte.</p></div>
+          <div><b>5</b><h3>Divide y paga desde tu mesa</h3><p>Propina, partes iguales o cada quien lo suyo. Todo aquí.</p></div>
         </li>
       </ol>
-      <button class="boton-principal" data-accion="ir" data-destino="menu">Empezar</button>
+      <div class="cta-fija">
+        <button class="boton-principal" data-accion="ir" data-destino="mesa">Empezar <span aria-hidden="true">→</span></button>
+      </div>
     </section>
 
-    <!-- 2. Menú: categorías y platillos -->
+    <!-- 2. ¿Solo o con amigos? Se decide antes de pedir cómo se dividirá la cuenta -->
+    <section class="pantalla" data-pantalla="mesa">
+      <p class="antetitulo">Antes de pedir</p>
+      <h2>¿Vienes solo o con amigos?</h2>
+      <div class="elegir-grupo">
+        <button class="opcion-grande" data-accion="grupo-solo">
+          <span class="opcion-icono" aria-hidden="true">🙋</span>
+          <span><strong>Vengo solo</strong><small>Una sola cuenta</small></span>
+        </button>
+        <button class="opcion-grande" data-accion="grupo-amigos" data-ref="opcion-amigos">
+          <span class="opcion-icono" aria-hidden="true">👯</span>
+          <span><strong>Vengo con amigos</strong><small>Dividimos la cuenta</small></span>
+        </button>
+      </div>
+
+      <div class="grupo" data-ref="grupo" hidden>
+        <p class="rotulo">¿Quiénes están en la mesa?</p>
+        <div class="personas" data-lista="personas-grupo"></div>
+        <form class="agregar-persona" data-ref="form-persona">
+          <input type="text" data-ref="nombre-persona" placeholder="Nombre de tu amigo" maxlength="14" autocomplete="off">
+          <button class="boton-icono" type="submit" aria-label="Agregar persona">+</button>
+        </form>
+
+        <p class="rotulo">¿Cómo van a dividir la cuenta?</p>
+        <div class="modos">
+          <button class="modo" data-accion="modo" data-valor="iguales">
+            <span class="modo-grafico" aria-hidden="true"><i></i><i></i><i></i></span>
+            <strong>Partes iguales</strong><small>El total entre todos</small>
+          </button>
+          <button class="modo" data-accion="modo" data-valor="consumo">
+            <span class="modo-grafico consumo" aria-hidden="true"><i></i><i></i><i></i></span>
+            <strong>Cada quien lo suyo</strong><small>Paga lo que pidió</small>
+          </button>
+        </div>
+        <button class="boton-principal" data-accion="ir" data-destino="menu">Ver el menú</button>
+      </div>
+    </section>
+
+    <!-- 3. Menú: categorías y platillos -->
     <section class="pantalla" data-pantalla="menu">
       <p class="antetitulo">Menú de hoy</p>
       <h2 class="titulo-pantalla">¿Qué se te antoja?</h2>
@@ -98,17 +177,17 @@
       <div class="lista-platillos" data-lista="platillos"></div>
     </section>
 
-    <!-- 3. Detalle del platillo + experiencia inmersiva -->
+    <!-- 4. Detalle del platillo + experiencia inmersiva -->
     <section class="pantalla" data-pantalla="detalle">
       <div class="escenario">
         <div class="contenedor-visor" data-ref="visor"></div>
-        <span class="pista-giro">Gíralo · si lo sacudes mucho se cae 😉</span>
+        <span class="pista-giro">Gíralo · sacúdelo y se cae 😉</span>
       </div>
 
       <!-- Función extra: abre la cámara y pone el platillo a escala real sobre la mesa -->
       <button class="boton-ar" data-accion="ver-en-mi-mesa">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 3 7v10l9 5 9-5V7l-9-5Zm0 2.3 6.6 3.7L12 11.7 5.4 8 12 4.3ZM5 9.7l6 3.4v6.6l-6-3.4V9.7Zm8 10v-6.6l6-3.4v6.6l-6 3.4Z"/></svg>
-        <span>Ver en mi mesa<small>Tamaño real con la cámara</small></span>
+        <span>Ver en mi mesa<small>Tamaño real · con su info nutricional</small></span>
       </button>
       <p class="aviso-ar" data-ref="aviso-ar" hidden>Abre este menú en tu celular para ver el platillo sobre tu mesa.</p>
 
@@ -117,22 +196,25 @@
         <p class="precio" data-ref="precio"></p>
       </div>
       <p class="descripcion" data-ref="descripcion"></p>
-      <p class="contiene" data-ref="contiene"></p>
 
       <dl class="nutricion">
         <div><dt>Porción</dt><dd data-ref="porcion"></dd></div>
         <div><dt>Calorías</dt><dd data-ref="kcal"></dd></div>
-        <div><dt>Carbohidratos</dt><dd data-ref="carbohidratos"></dd></div>
+        <div><dt>Carbs</dt><dd data-ref="carbohidratos"></dd></div>
         <div><dt>Carne</dt><dd data-ref="carne"></dd></div>
       </dl>
-      <p class="nota">Valores aproximados de una porción de referencia.</p>
+      <p class="contiene" data-ref="contiene"></p>
 
       <div class="bloque">
         <p class="rotulo">¿Alguna alergia?</p>
-        <div class="opciones envolver" data-lista="alergias"></div>
-        <label class="campo">Notas para cocina
-          <input type="text" data-ref="notas" placeholder="Ej. sin cebolla, término medio…">
-        </label>
+        <div class="alergias" data-lista="alergias"></div>
+        <input class="entrada" type="text" data-ref="otra-alergia" placeholder="¿Otra alergia? Escríbela aquí">
+        <p class="rotulo">Notas para cocina</p>
+        <input class="entrada" type="text" data-ref="notas" placeholder="Ej. sin cebolla, término medio…">
+        <div class="para-quien" data-ref="para-quien" hidden>
+          <p class="rotulo">¿Para quién es?</p>
+          <div class="opciones envolver" data-lista="para-quien"></div>
+        </div>
       </div>
 
       <div class="accion-fija">
@@ -141,13 +223,13 @@
           <span data-ref="cantidad">1</span>
           <button class="boton-icono" data-accion="mas" aria-label="Agregar uno">+</button>
         </div>
-        <button class="boton-principal" data-accion="agregar">Agregar al pedido</button>
+        <button class="boton-principal" data-accion="agregar">Agregar <span data-ref="precio-agregar"></span></button>
       </div>
     </section>
 
-    <!-- 4. Pedido (carrito) -->
+    <!-- 5. Pedido (carrito) -->
     <section class="pantalla" data-pantalla="pedido">
-      <p class="antetitulo">Mesa lista</p>
+      <p class="antetitulo">Tu mesa</p>
       <h2>Tu pedido</h2>
       <div data-lista="pedido"></div>
       <div class="vacio" data-ref="pedido-vacio">
@@ -160,20 +242,28 @@
       <button class="boton-texto" data-accion="ir" data-destino="menu">+ Agregar otro platillo</button>
     </section>
 
-    <!-- 5. Estado del pedido -->
+    <!-- 6. Estado del pedido: recibido → preparando → en tu mesa -->
     <section class="pantalla" data-pantalla="estado">
-      <div class="icono-ok" aria-hidden="true">✓</div>
-      <h2>¡Tus alimentos van en camino!</h2>
-      <p data-ref="estado-texto">Cocina ya recibió tu pedido.</p>
-      <ol class="progreso" aria-label="Estado del pedido">
-        <li class="hecho">Recibido</li><li class="actual">Preparando</li><li>En tu mesa</li>
+      <div class="sello-ok" data-ref="sello-ok" aria-hidden="true">
+        <svg viewBox="0 0 100 100"><circle class="sello-circulo" cx="50" cy="50" r="44"/><path class="sello-palomita" d="M30 52l13 13 27-28"/></svg>
+        <span class="chispas"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+      </div>
+      <h2 data-ref="estado-titulo">¡Pedido recibido!</h2>
+      <p data-ref="estado-texto">Cocina ya tiene tu pedido.</p>
+      <ol class="progreso" data-ref="progreso" aria-label="Estado del pedido">
+        <li data-etapa="0"><span class="etapa-icono">✓</span>Recibido</li>
+        <li data-etapa="1"><span class="etapa-icono">🍳</span>Preparando</li>
+        <li data-etapa="2"><span class="etapa-icono">🔔</span>En tu mesa</li>
       </ol>
+      <div class="cocina" data-ref="cocina" aria-hidden="true">
+        <span class="sarten"></span><span class="vapor"><i></i><i></i><i></i></span>
+      </div>
       <div data-lista="enviados"></div>
       <button class="boton-principal" data-accion="ir" data-destino="pago">Pedir la cuenta</button>
       <button class="boton-secundario" data-accion="ir" data-destino="menu">Pedir algo más</button>
     </section>
 
-    <!-- 6. Método de pago (va antes de la cuenta) -->
+    <!-- 7. Método de pago (va antes de la cuenta) -->
     <section class="pantalla" data-pantalla="pago">
       <p class="antetitulo">Paso 1 de 2</p>
       <h2>¿Cómo quieres pagar?</h2>
@@ -186,12 +276,11 @@
       <button class="boton-principal" data-accion="elegir-metodo">Continuar</button>
     </section>
 
-    <!-- 7. Cuenta clara: propina libre y dividir -->
+    <!-- 8. Cuenta clara: propina libre y dividir (partes iguales o por consumo) -->
     <section class="pantalla" data-pantalla="cuenta">
       <p class="antetitulo">Paso 2 de 2</p>
       <h2>Cuenta clara</h2>
-      <div data-lista="cuenta"></div>
-      <p class="subtotal">Subtotal <strong data-ref="subtotal"></strong></p>
+      <p class="subtotal">Consumo <strong data-ref="subtotal"></strong></p>
 
       <div class="tarjeta-control">
         <div class="control-encabezado">
@@ -206,18 +295,33 @@
       </div>
 
       <div class="tarjeta-control">
-        <div class="control-encabezado">
-          <p class="rotulo">Dividir entre</p>
-          <div class="cantidad">
-            <button class="boton-icono" data-accion="menos-personas" aria-label="Menos personas">−</button>
-            <span data-ref="personas">1</span>
-            <button class="boton-icono" data-accion="mas-personas" aria-label="Más personas">+</button>
-          </div>
+        <p class="rotulo">Dividir la cuenta</p>
+        <div class="segmentos" role="tablist">
+          <button role="tab" data-accion="dividir" data-valor="iguales">Partes iguales</button>
+          <button role="tab" data-accion="dividir" data-valor="consumo">Lo que consumí</button>
         </div>
-        <div class="comensales" data-lista="comensales"></div>
+
+        <div data-ref="panel-iguales">
+          <div class="control-encabezado">
+            <p>Total entre</p>
+            <div class="cantidad">
+              <button class="boton-icono" data-accion="menos-personas" aria-label="Menos personas">−</button>
+              <span data-ref="personas">1</span>
+              <button class="boton-icono" data-accion="mas-personas" aria-label="Más personas">+</button>
+            </div>
+          </div>
+          <div class="comensales" data-lista="comensales"></div>
+        </div>
+
+        <div data-ref="panel-consumo" hidden>
+          <p class="nota">Toca la persona junto a cada platillo para cambiar quién lo pidió.</p>
+          <div data-lista="asignar"></div>
+          <div class="reparto" data-lista="reparto"></div>
+        </div>
+
         <div class="aviso-nfc" data-ref="aviso-nfc" hidden>
           <span class="nfc-icono" aria-hidden="true"><i></i><i></i><i></i></span>
-          <p>Diles a tus amigos que <strong>acerquen su celular a la tarjeta NFC</strong> de la mesa (o escaneen el QR). Les saldrá esta cuenta para pagar <strong>su parte</strong>.</p>
+          <p>Que tus amigos <strong>acerquen su celular a la tarjeta NFC</strong> de la mesa: les sale esta cuenta para pagar <strong>su parte</strong>.</p>
         </div>
       </div>
 
@@ -228,11 +332,22 @@
       <p class="nota centrada">Prototipo escolar: el pago es una simulación.</p>
     </section>
 
-    <!-- 8. Gracias + encuesta -->
+    <!-- 9. Gracias: califica al mesero, la experiencia y deja reseña en Google -->
     <section class="pantalla" data-pantalla="gracias">
-      <div class="icono-ok" aria-hidden="true">♥</div>
+      <div class="sello-ok chico" aria-hidden="true">
+        <svg viewBox="0 0 100 100"><circle class="sello-circulo" cx="50" cy="50" r="44"/><path class="sello-palomita" d="M30 52l13 13 27-28"/></svg>
+      </div>
       <h2>¡Gracias por tu visita!</h2>
       <p data-ref="metodo-elegido"></p>
+
+      <div class="tarjeta-control mesero">
+        <div class="mesero-cabeza">
+          <span class="mesero-foto" aria-hidden="true">🧑‍🍳</span>
+          <div><p class="rotulo">¿Cómo te atendió <span data-ref="mesero-nombre"></span>?</p><small data-ref="mesero-etiqueta">Toca una carita</small></div>
+        </div>
+        <div class="caritas" data-lista="caritas"></div>
+        <div class="opciones envolver" data-lista="mesero-tags" hidden></div>
+      </div>
 
       <div class="tarjeta-control">
         <p class="rotulo">¿Qué tanto te ayudó ver el platillo en tu mesa antes de pedirlo?</p>
@@ -242,12 +357,20 @@
         <p class="rotulo">¿Qué tan cómodo fue pedir y pagar con el menú digital?</p>
         <div class="estrellas" data-lista="encuesta-menu"></div>
       </div>
-      <p class="gracias-encuesta" data-ref="encuesta-gracias" hidden>¡Gracias por tu respuesta!</p>
 
-      <a class="boton-google" data-ref="resena-google" target="_blank" rel="noopener">
-        <span class="g" aria-hidden="true">G</span>
-        <span>Déjanos tus estrellas en Google<small>★★★★★</small></span>
-      </a>
+      <!-- Reseña con el formato de Google; se publica en Google -->
+      <div class="google">
+        <div class="google-cabeza">
+          <svg class="google-g" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>
+          <div><strong>Chefi · Restaurante</strong><small>Publicar reseña en Google</small></div>
+        </div>
+        <div class="estrellas google-estrellas" data-lista="estrellas-google"></div>
+        <textarea data-ref="texto-google" rows="3" placeholder="Comparte detalles de tu experiencia (opcional)"></textarea>
+        <button class="google-publicar" data-accion="publicar-google">Publicar</button>
+        <small class="google-nota">Se abrirá Google para confirmar tu reseña. Tu texto se copia para que solo lo pegues.</small>
+      </div>
+
+      <p class="gracias-encuesta" data-ref="encuesta-gracias" hidden>¡Gracias por tus respuestas!</p>
       <button class="boton-secundario" data-accion="ir" data-destino="bienvenida">Volver al inicio</button>
     </section>
   </main>
@@ -257,7 +380,7 @@
     <span><span class="burbuja" data-ref="barra-cantidad"></span> Ver pedido</span><strong data-ref="barra-total"></strong>
   </button>
 
-  <!-- Aviso breve al agregar un platillo -->
+  <!-- Aviso breve -->
   <div class="aviso-flotante" data-ref="aviso" role="status" hidden></div>
 
   <!-- "Se cayó el platillo": la pantalla se llena de ingredientes -->
@@ -304,7 +427,24 @@
   </template>
 
   <template data-plantilla="alergia">
-    <button class="chip" data-accion="alergia" aria-pressed="false"></button>
+    <button class="alergia" data-accion="alergia" aria-pressed="false"><span class="alergia-icono"></span><span class="alergia-nombre"></span></button>
+  </template>
+
+  <template data-plantilla="persona">
+    <span class="persona"><span class="persona-avatar"></span><span class="persona-nombre"></span><button class="persona-quitar" data-accion="quitar-persona" aria-label="Quitar">×</button></span>
+  </template>
+
+  <template data-plantilla="asignacion">
+    <div class="asignacion">
+      <span class="asignacion-nombre"></span>
+      <button class="chip chip-persona" data-accion="asignar"></button>
+    </div>
+  </template>
+
+  <template data-plantilla="reparto">
+    <button class="reparto-fila" data-accion="quien-paga">
+      <span class="persona-avatar"></span><span class="reparto-nombre"></span><span class="reparto-detalle"></span><strong class="reparto-monto"></strong>
+    </button>
   </template>
 
   <template data-plantilla="ingrediente">

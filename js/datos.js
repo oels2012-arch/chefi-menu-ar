@@ -19,6 +19,8 @@ export const PLATILLOS = [
     precio: 189,
     foto: "img/hamburguesa.jpg",
     modelo: "modelos/fuerte_hamburguesa.glb",
+    modeloIOS: "modelos/fuerte_hamburguesa.usdz",
+    alto: 0.131,
     porcion: "≈ 350 g",
     kcal: 950,
     carbohidratos: "95 g",
@@ -34,6 +36,8 @@ export const PLATILLOS = [
     precio: 165,
     foto: "img/pasta.jpg",
     modelo: "modelos/pasta_bolognesa.glb",
+    modeloIOS: "modelos/pasta_bolognesa.usdz",
+    alto: 0.097,
     porcion: "≈ 350 g",
     kcal: 560,
     carbohidratos: "70 g",
@@ -49,6 +53,8 @@ export const PLATILLOS = [
     precio: 129,
     foto: "img/ensalada.jpg",
     modelo: "modelos/ensalada.glb",
+    modeloIOS: "modelos/ensalada.usdz",
+    alto: 0.071,
     porcion: "≈ 250 g",
     kcal: 220,
     carbohidratos: "15 g",
@@ -64,6 +70,8 @@ export const PLATILLOS = [
     precio: 85,
     foto: "img/pastel.jpg",
     modelo: "modelos/postre_pastel.glb",
+    modeloIOS: "modelos/postre_pastel.usdz",
+    alto: 0.086,
     porcion: "≈ 120 g",
     kcal: 450,
     carbohidratos: "55 g",
@@ -77,7 +85,17 @@ export const PLATILLOS = [
 export const PROPINA_INICIAL = 15;
 export const MAX_PERSONAS = 10;
 
-export const ALERGIAS = ["Gluten", "Lácteos", "Huevo", "Nueces", "Mariscos", "Soya"];
+// Alergias más comunes (con su ícono). Además hay un campo para escribir otra.
+export const ALERGIAS = [
+  { id: "gluten", nombre: "Gluten", icono: "🌾" },
+  { id: "lacteos", nombre: "Lácteos", icono: "🥛" },
+  { id: "huevo", nombre: "Huevo", icono: "🥚" },
+  { id: "nueces", nombre: "Nueces", icono: "🥜" },
+  { id: "mariscos", nombre: "Mariscos", icono: "🦐" },
+];
 
-// Enlace para dejar reseña en Google. Cambiarlo por el del restaurante real (Google Business → "Pedir reseñas").
+export const MESERO = { nombre: "Carlos" };
+
+// Reseña en Google. Cambiar por el enlace "Pedir reseñas" del perfil de Google Business del restaurante real
+// (tiene la forma https://search.google.com/local/writereview?placeid=...).
 export const RESENA_GOOGLE = "https://www.google.com/search?q=Chefi+restaurante";
