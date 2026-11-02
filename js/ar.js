@@ -36,6 +36,7 @@ function urlIOS(platillo) {
     checkoutSubtitle: `${platillo.kcal} kcal · ${platillo.porcion} · Carbs ${platillo.carbohidratos}`,
     price: `$${platillo.precio}.00`,
     callToAction: "Agregar al pedido",
+    allowsContentScaling: "0", // siempre a tamaño real: pellizcar no lo agranda
   });
   return `${platillo.modeloIOS}#${datos.toString().replace(/\+/g, "%20")}`;
 }
@@ -71,6 +72,11 @@ export function montarVisor(contenedor, platillo, { alAgregar } = {}) {
   if (ios) visor.setAttribute("ios-src", ios);
   else visor.removeAttribute("ios-src");
   visor.setAttribute("poster", platillo.foto);
+  // En iPhone, el USDZ se baja en cuanto termina de cargar el 3D (para no competir con él), así la cámara
+  // abre sin esperar.
+  if (ios && /iPhone|iPad|Macintosh/.test(navigator.userAgent) && "ontouchend" in document) {
+    visor.addEventListener("load", () => fetch(platillo.modeloIOS, { priority: "low" }).catch(() => {}), { once: true });
+  }
   visor.setAttribute("alt", `Modelo 3D de ${platillo.nombre}`);
   contenedor.replaceChildren(visor);
   return visor;

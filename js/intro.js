@@ -315,7 +315,7 @@ export function iniciarIntro({ mostrar, mesa }) {
     for (const s of SFX) {
       if (s.at > ultimo && s.at <= f) {
         if (audioActivo()) sonar(s.s, s.v * GANANCIA);
-        if (s.golpe) vibrar([45, 35, 110]); // golpe del logo (Android, si ya tocó la pantalla)
+        if (s.golpe) vibrar([90, 40, 180]); // golpe del logo (Android, si ya tocó la pantalla)
       }
     }
     ultimo = f;
@@ -331,10 +331,9 @@ export function iniciarIntro({ mostrar, mesa }) {
     if (tocado) return;
     tocado = true;
     desbloquearAudio();
-    vibrar(18); // dentro del toque: en iPhone es el único momento en que se puede
+    vibrar([40, 60, 60]); // dentro del toque: en iPhone es el único momento en que se puede
     aviso.classList.remove("visible");
   };
-  intro.addEventListener("pointerdown", desbloquearAudio);
   intro.addEventListener("click", alTocar);
   saltar.addEventListener("click", (e) => {
     e.stopPropagation();

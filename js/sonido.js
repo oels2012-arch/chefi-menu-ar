@@ -16,6 +16,8 @@ let cargando = null;
 function crear() {
   if (ctx) return ctx;
   try {
+    // iPhone: sin esto, Web Audio se calla con el interruptor de silencio (Safari 16.4+).
+    if (navigator.audioSession) navigator.audioSession.type = "playback";
     ctx = new (window.AudioContext || window.webkitAudioContext)();
     // Un compresor suave al final evita que los sonidos que coinciden se saturen.
     salidaGeneral = ctx.createDynamicsCompressor();
@@ -47,15 +49,45 @@ export function prepararAudio() {
 // true si el navegador ya deja reproducir sonido.
 export const audioActivo = () => ctx?.state === "running";
 
-// Se llama dentro de un toque del usuario.
+// Se llama dentro de un toque del usuario. En iPhone el audio solo se desbloquea al soltar el dedo (touchend,
+// click), no al apoyarlo; y al volver de la cámara AR queda "interrumpido", así que se reanuda en cada toque
+// mientras no esté sonando.
+let silencioTocado = false;
+let reanudando = null; // promesa mientras el audio arranca
+
+// Si el audio está arrancando (primer toque), el sonido espera a que arranque en vez de perderse.
+function cuandoSuene(fn) {
+  if (audioActivo()) return fn();
+  reanudando?.then(() => audioActivo() && fn());
+}
 export function desbloquearAudio() {
   if (!crear()) return;
-  if (ctx.state === "suspended") ctx.resume().catch(() => {});
+  if (ctx.state !== "running" && !reanudando) {
+    reanudando = ctx.resume().catch(() => {}).finally(() => { reanudando = null; });
+  }
+  if (!silencioTocado) {
+    // Un sonido vacío dentro del toque termina de "abrir" el audio en Safari.
+    try {
+      const fuente = ctx.createBufferSource();
+      fuente.buffer = ctx.createBuffer(1, 1, 22050);
+      fuente.connect(ctx.destination);
+      fuente.start(0);
+      silencioTocado = true;
+    } catch {}
+  }
   cargar();
 }
 
+// Escucha todos los gestos que sirven para desbloquear el audio.
+export function escucharDesbloqueo() {
+  for (const evento of ["touchend", "pointerup", "click", "keydown"]) {
+    document.addEventListener(evento, desbloquearAudio, { capture: true, passive: true });
+  }
+}
+
 export function sonar(nombre, volumen = 0.6) {
-  if (!audioActivo() || !buffers[nombre]) return;
+  if (!audioActivo()) return cuandoSuene(() => sonar(nombre, volumen));
+  if (!buffers[nombre]) return;
   const fuente = ctx.createBufferSource();
   const ganancia = ctx.createGain();
   ganancia.gain.value = volumen;
@@ -134,7 +166,7 @@ const PENTATONICA = [1046.5, 1174.7, 1318.5, 1568, 1760];
 
 // Estrellas: una gota por estrella, subiendo hasta la elegida; la última suena un poco más.
 export function sonidoEstrella(valor) {
-  if (!audioActivo()) return;
+  if (!audioActivo()) return cuandoSuene(() => sonidoEstrella(valor));
   roce(0, 0.05);
   for (let i = 0; i < valor; i++) {
     const ultima = i === valor - 1;
@@ -146,7 +178,7 @@ export function sonidoEstrella(valor) {
 // Caritas: burbuja grave para "mal" y más aguda y doble para "increíble".
 const TONO_CARITA = [330, 392, 494, 587, 659];
 export function sonidoCarita(nivel) {
-  if (!audioActivo()) return;
+  if (!audioActivo()) return cuandoSuene(() => sonidoCarita(nivel));
   const i = Math.max(0, Math.min(4, nivel - 1));
   roce(0, 0.04, 3400, 0.014);
   burbuja(TONO_CARITA[i], 0.005, 0.2);
@@ -156,7 +188,7 @@ export function sonidoCarita(nivel) {
 
 // Toque mínimo para chips y motivos.
 export function sonidoToque() {
-  if (!audioActivo()) return;
+  if (!audioActivo()) return cuandoSuene(() => sonidoToque());
   roce(0, 0.05, 4200, 0.012);
   gota(1318.5, 0.004, 0.035, 0.12);
 }
@@ -285,44 +317,48 @@ const EFECTOS = {
 };
 
 export function efecto(nombre) {
-  if (!audioActivo() || !EFECTOS[nombre]) return;
-  EFECTOS[nombre]();
+  if (!EFECTOS[nombre]) return;
+  cuandoSuene(() => EFECTOS[nombre]());
 }
 
 // Propina: un clic que sube de tono con el porcentaje.
 export function sonidoPropina(porcentaje) {
-  if (!audioActivo()) return;
+  if (!audioActivo()) return cuandoSuene(() => sonidoPropina(porcentaje));
   roce(0, 0.03, 4500, 0.008);
   gota(700 + porcentaje * 22, 0, 0.022, 0.07);
 }
 
 // ---------- Vibración ----------
-// Android: Vibration API con patrón. iPhone (iOS 18+): no tiene Vibration API, pero tocar un
-// interruptor nativo produce un golpe háptico; solo funciona dentro de un toque del usuario.
-let interruptor = null;
+// Android: Vibration API. No deja elegir la fuerza, solo la duración, y los pulsos de menos de ~30 ms casi no se
+// sienten; por eso cada pulso se alarga (mínimo 40 ms) y se refuerza.
+// iPhone (iOS 18+): no tiene Vibration API; tocar un interruptor nativo produce un golpe háptico, pero solo dentro
+// de un toque del usuario y siempre con la misma fuerza. Para que se sienta más, los golpes fuertes se repiten.
 function golpeIOS() {
-  if (!interruptor) {
-    interruptor = document.createElement("label");
-    interruptor.setAttribute("aria-hidden", "true");
-    interruptor.style.cssText = "position:fixed;left:-9999px;opacity:0;pointer-events:none";
-    const entrada = document.createElement("input");
-    entrada.type = "checkbox";
-    entrada.setAttribute("switch", "");
-    entrada.tabIndex = -1;
-    interruptor.append(entrada);
-    document.body.append(interruptor);
-  }
-  interruptor.click();
+  const etiqueta = document.createElement("label");
+  etiqueta.setAttribute("aria-hidden", "true");
+  etiqueta.style.display = "none";
+  const entrada = document.createElement("input");
+  entrada.type = "checkbox";
+  entrada.setAttribute("switch", "");
+  etiqueta.append(entrada);
+  document.head.append(etiqueta);
+  etiqueta.click();
+  etiqueta.remove();
 }
 
+const REFUERZO = 2.4;
 export function vibrar(patron = 12) {
+  const pulsos = Array.isArray(patron) ? patron : [patron];
   if (navigator.vibrate) {
-    try { navigator.vibrate(patron); } catch {}
+    const fuerte = pulsos.map((ms, i) => (i % 2 === 0 ? Math.min(500, Math.max(40, Math.round(ms * REFUERZO))) : ms));
+    try { navigator.vibrate(fuerte); } catch {}
     return;
   }
-  const golpes = Array.isArray(patron) ? patron.filter((_, i) => i % 2 === 0).length : 1;
+  const encendidos = pulsos.filter((_, i) => i % 2 === 0);
+  const total = encendidos.reduce((a, b) => a + b, 0);
+  const golpes = Math.min(3, Math.max(encendidos.length, total >= 40 ? 2 : 1));
   golpeIOS();
-  for (let i = 1; i < Math.min(golpes, 3); i++) setTimeout(golpeIOS, i * 120);
+  for (let i = 1; i < golpes; i++) setTimeout(golpeIOS, i * 90);
 }
 
 // Mini conversión: sonido + vibración juntos.

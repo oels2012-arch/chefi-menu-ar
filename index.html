@@ -10,6 +10,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;900&family=Inter+Tight:wght@400;500;600;700;800&family=Fredoka:wght@500;600&display=swap">
   <link rel="icon" href="img/icono.svg" type="image/svg+xml">
+  <link rel="preload" href="img/hero_hamburguesa.webp" as="image" type="image/webp" fetchpriority="high">
+  <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
   <link rel="stylesheet" href="css/estilos.css">
   <script type="module" src="https://cdn.jsdelivr.net/npm/@google/model-viewer@3.5.0/dist/model-viewer.min.js"></script>
   <script type="module" src="js/app.js"></script>
@@ -60,7 +62,7 @@
         </h1>
         <div class="heroe-puntos" data-lista="puntos-heroe" aria-hidden="true"></div>
         <div class="heroe-plato">
-          <img src="img/hero_hamburguesa.webp" alt="Hamburguesa con papas de Chefi" width="760" height="544">
+          <img src="img/hero_hamburguesa.webp" alt="Hamburguesa con papas de Chefi" width="760" height="544" fetchpriority="high" decoding="async">
           <span class="heroe-sombra" aria-hidden="true"></span>
           <svg class="sello-giratorio" viewBox="0 0 120 120" aria-hidden="true">
             <defs><path id="circulo" d="M60 60m-46 0a46 46 0 1 1 92 0a46 46 0 1 1-92 0"/></defs>
@@ -437,7 +439,7 @@
 
   <template data-plantilla="tarjeta-platillo">
     <article class="tarjeta" data-accion="abrir-platillo">
-      <div class="tarjeta-foto"><img data-ref="foto" alt=""><span class="etiqueta-ar" data-ref="etiqueta-ar">3D</span></div>
+      <div class="tarjeta-foto"><img data-ref="foto" alt="" width="112" height="112" decoding="async"><span class="etiqueta-ar" data-ref="etiqueta-ar">3D</span></div>
       <div class="tarjeta-texto">
         <h3 data-ref="nombre"></h3>
         <p data-ref="descripcion"></p>

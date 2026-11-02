@@ -4,7 +4,7 @@
 import { CATEGORIAS, PLATILLOS, PROPINA_INICIAL, MAX_PERSONAS, ALERGIAS, MESERO, RESENA_GOOGLE, NIVELES, CALIFICAR, ASPECTOS_CHEF } from "./datos.js";
 import { montarVisor, verEnMiMesa, reiniciarVisor } from "./ar.js";
 import { vigilarSacudida, lluviaDeIngredientes } from "./caida.js";
-import { prepararAudio, desbloquearAudio, sonar, vibrar, sentir, efecto, sonidoEstrella, sonidoCarita, sonidoToque, sonidoPropina } from "./sonido.js";
+import { prepararAudio, escucharDesbloqueo, desbloquearAudio, sonar, vibrar, sentir, efecto, sonidoEstrella, sonidoCarita, sonidoToque, sonidoPropina } from "./sonido.js";
 import { icono, carita, billete, monedaSvg } from "./iconos.js";
 import { iniciarIntro } from "./intro.js";
 import { iniciarFondo, pedirMovimiento } from "./fondo.js";
@@ -212,6 +212,7 @@ function pintarMesa() {
 // ---------- 3. Menú ----------
 
 function pintarMenu() {
+  precargarModelos();
   lista("categorias").replaceChildren(...CATEGORIAS.map((c) => {
     const chip = copiar("categoria");
     chip.textContent = c.nombre;
@@ -224,7 +225,7 @@ function pintarMenu() {
     const tarjeta = copiar("tarjeta-platillo");
     tarjeta.dataset.id = p.id;
     tarjeta.style.animationDelay = `${i * 80}ms`;
-    ref("foto", tarjeta).src = p.foto;
+    ref("foto", tarjeta).src = p.miniatura ?? p.foto;
     texto("nombre", p.nombre, tarjeta);
     texto("descripcion", p.descripcion, tarjeta);
     texto("precio", dinero.format(p.precio), tarjeta);
@@ -826,7 +827,13 @@ const acciones = {
   },
   categoria: (el) => { estado.categoria = el.dataset.id; efecto("seleccion"); pintarMenu(); },
   "abrir-platillo": (el) => { efecto("abrir"); ir(`platillo/${el.dataset.id}`); },
-  "ver-en-mi-mesa": () => { efecto("abrir"); vibrar(20); ref("aviso-ar").hidden = verEnMiMesa(); },
+  "ver-en-mi-mesa": () => {
+    efecto("abrir");
+    vibrar(20);
+    const abierto = verEnMiMesa();
+    ref("aviso-ar").hidden = abierto;
+    if (abierto) avisar("Apunta a la mesa y mueve el celular despacio", "girar");
+  },
   mas: () => { estado.cantidad++; efecto("mas"); vibrar(10); pintarCantidad(); },
   menos: () => { estado.cantidad = Math.max(1, estado.cantidad - 1); efecto("menos"); vibrar(10); pintarCantidad(); },
   alergia: (el) => {
@@ -1002,6 +1009,25 @@ ref("aviso").addEventListener("animationend", (evento) => {
 
 // ---------- Inicio ----------
 
+// Precarga en segundo plano: mientras corre la intro bajan las fotos; luego, sin estorbar, los modelos 3D.
+// Así el menú y el visor abren al instante (GitHub Pages deja los archivos en la caché del navegador).
+function precargar() {
+  for (const p of PLATILLOS) {
+    for (const src of [p.miniatura, p.foto]) if (src) Object.assign(new Image(), { decoding: "async", src });
+  }
+}
+
+// Los modelos 3D se bajan cuando el comensal ya está en el menú (no mientras otro 3D está cargando).
+let modelosPrecargados = false;
+function precargarModelos() {
+  if (modelosPrecargados) return;
+  modelosPrecargados = true;
+  const despues = window.requestIdleCallback ?? ((fn) => setTimeout(fn, 1200));
+  despues(() => {
+    for (const p of PLATILLOS) if (p.modelo) fetch(p.modelo, { priority: "low" }).catch(() => {});
+  }, { timeout: 3000 });
+}
+
 // Pone el dibujo SVG en cada elemento con data-icono="nombre" (ver js/iconos.js).
 function pintarIconos(raiz = document) {
   raiz.querySelectorAll("[data-icono]").forEach((el) => {
@@ -1014,6 +1040,8 @@ cargar();
 estado.calif ??= { mesero: null, chef: null, motivos: { mesero: [], chef: [] }, aspectos: {} };
 estado.propinas ??= {};
 prepararAudio();
+escucharDesbloqueo();
+precargar();
 pintarIconos();
 texto("mesa", estado.mesa ? `Mesa ${estado.mesa}` : "");
 iniciarFondo();

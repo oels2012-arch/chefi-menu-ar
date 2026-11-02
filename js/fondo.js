@@ -5,7 +5,7 @@ export function iniciarFondo() {
   const fondo = document.querySelector("[data-ref='fondo']");
   const capaParticulas = fondo.querySelector(".particulas");
   const colores = ["#F26B1D", "#2E9E6A", "#F6C445", "#1F1F1F"];
-  for (let i = 0; i < 26; i++) {
+  for (let i = 0; i < 16; i++) {
     const p = document.createElement("i");
     const z = Math.random(); // 0 = lejos, 1 = cerca
     p.style.cssText = `left:${Math.random() * 100}%;top:${Math.random() * 100}%;` +
