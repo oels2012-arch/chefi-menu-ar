@@ -4,8 +4,8 @@
 // "chefi". Arranca sola. El navegador no deja sonar ni vibrar hasta que el usuario toca la pantalla: si ya trae el
 // sonido permitido, suena desde el inicio; si no, en cuanto toca se activan el sonido y la vibración.
 
-import { sonar, audioActivo, desbloquearAudio, vibrar } from "./sonido.js?v=202611021452";
-import { icono } from "./iconos.js?v=202611021452";
+import { sonar, sonidoLogo, efecto, audioActivo, desbloquearAudio, vibrar } from "./sonido.js?v=202611021636";
+import { icono } from "./iconos.js?v=202611021636";
 
 const FPS = 30;
 const FIN = 150; // cuadro en que la experiencia entra (el render web duraba 156)
@@ -78,7 +78,7 @@ const SFX = [
   { s: "whooshlow", at: 0, v: 0.5 },
   ...Array.from({ length: 10 }, (_, i) => ({ s: POPS[i % 5], at: aparece(i * 2), v: 0.28 })),
   { s: "assemble2", at: T0 + 24, v: 0.8 },
-  ...Array.from({ length: 7 }, (_, k) => ({ s: "tick", at: T0 + 30 + k * 2.4, v: 0.32 })),
+  ...Array.from({ length: 7 }, (_, k) => ({ s: "tick", at: T0 + 30 + k * 2.4, v: 0.9 })),
   { s: "logo", at: T0 + 54, v: 0.8, golpe: true },
   { s: "shimmer", at: T0 + 84, v: 0.5 },
 ];
@@ -315,9 +315,10 @@ export function iniciarIntro({ mostrar, mesa }) {
     const f = ((ahora - arranque) / 1000) * FPS;
     for (const s of SFX) {
       if (s.at > ultimo && s.at <= f) {
-        if (audioActivo()) {
+        // Ya tocaron: el audio puede estar arrancando; sonar() lo deja en espera y suena en cuanto arranque.
+        if (audioActivo() || tocado) {
           sonar(s.s, s.v * GANANCIA);
-          if (s.golpe) sonoLogo = true;
+          if (s.golpe) { sonidoLogo(); sonoLogo = true; }
         }
         if (s.golpe) vibrar([120, 50, 280]); // golpe del logo (Android, si ya tocó la pantalla)
       }
@@ -338,13 +339,14 @@ export function iniciarIntro({ mostrar, mesa }) {
     // Dentro del toque: en iPhone es el único momento en que se puede vibrar, así que va el golpe fuerte del logo.
     vibrar([120, 50, 280]);
     // Si el golpe del logo ya pasó sin sonido, suena ahora (espera a que el audio arranque).
-    if (ultimo >= T0 + 54 && !sonoLogo) sonar("logo", 0.8 * GANANCIA);
+    if (ultimo >= T0 + 54 && !sonoLogo) { sonar("logo", 0.8 * GANANCIA); sonidoLogo(); sonoLogo = true; }
     aviso.classList.remove("visible");
   };
   intro.addEventListener("click", alTocar);
   saltar.addEventListener("click", (e) => {
     e.stopPropagation();
     desbloquearAudio();
+    efecto("toque");
     terminar();
   });
 

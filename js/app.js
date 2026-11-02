@@ -1,13 +1,13 @@
 // Lógica del menú digital: navegación, grupo, pedido, estado del pedido, cuenta, pago y encuestas.
 // No depende del diseño: busca los elementos por sus atributos data-* (ver README.md).
 
-import { CATEGORIAS, PLATILLOS, PROPINA_INICIAL, MAX_PERSONAS, ALERGIAS, MESERO, RESENA_GOOGLE, NIVELES, CALIFICAR, ASPECTOS_CHEF } from "./datos.js?v=202611021452";
-import { montarVisor, verEnMiMesa, reiniciarVisor } from "./ar.js?v=202611021452";
-import { vigilarSacudida, lluviaDeIngredientes } from "./caida.js?v=202611021452";
-import { prepararAudio, escucharDesbloqueo, desbloquearAudio, sonar, vibrar, sentir, efecto, sonidoEstrella, sonidoCarita, sonidoToque, sonidoPropina } from "./sonido.js?v=202611021452";
-import { icono, carita, billete, monedaSvg } from "./iconos.js?v=202611021452";
-import { iniciarIntro } from "./intro.js?v=202611021452";
-import { iniciarFondo, pedirMovimiento } from "./fondo.js?v=202611021452";
+import { CATEGORIAS, PLATILLOS, PROPINA_INICIAL, MAX_PERSONAS, ALERGIAS, MESERO, RESENA_GOOGLE, NIVELES, CALIFICAR, ASPECTOS_CHEF } from "./datos.js?v=202611021636";
+import { montarVisor, verEnMiMesa, reiniciarVisor } from "./ar.js?v=202611021636";
+import { vigilarSacudida, lluviaDeIngredientes } from "./caida.js?v=202611021636";
+import { prepararAudio, escucharDesbloqueo, desbloquearAudio, sonar, vibrar, sentir, efecto, sonidoEstrella, sonidoCarita, sonidoToque, sonidoPropina } from "./sonido.js?v=202611021636";
+import { icono, carita, billete, monedaSvg } from "./iconos.js?v=202611021636";
+import { iniciarIntro } from "./intro.js?v=202611021636";
+import { iniciarFondo, pedirMovimiento } from "./fondo.js?v=202611021636";
 
 const ORDEN = ["bienvenida", "mesa", "menu", "detalle", "pedido", "estado", "pago", "cuenta", "gracias"];
 const FRASES = ["El menú se digitaliza.", "Acerca tu celular.", "Elige tu platillo.", "Míralo en tu mesa.", "Pídelo.",
@@ -351,10 +351,10 @@ function volarAlPedido(foto) {
     { transform: `translate(${dx}px, ${dy}px) scale(.12) rotate(20deg)`, opacity: 0.6 },
   ], { duration: 700, easing: "cubic-bezier(.5,0,.6,1)" }).finished.then(() => {
     img.remove();
-    const barra = ref("barra-pedido");
-    reanimar(barra, "brinco");
-    efecto("llega");
+    reanimar(ref("barra-pedido"), "brinco");
   });
+  // Con temporizador (no al terminar la animación): así sigue "dentro del toque" y el iPhone deja vibrar.
+  setTimeout(() => efecto("llega"), 700);
 }
 
 // ---------- "Se cayó el platillo" ----------
@@ -1033,4 +1033,4 @@ setInterval(revisarEtapa, 500);
 iniciarIntro({ mostrar: () => document.body.classList.add("listo"), mesa: estado.mesa ? `Mesa ${estado.mesa}` : "Bienvenido" });
 mostrar();
 // Panel de prueba de sonido y vibración: agregar ?prueba a la dirección.
-if (new URLSearchParams(location.search).has("prueba")) import("./prueba.js?v=202611021452").then((m) => m.abrirPrueba());
+if (new URLSearchParams(location.search).has("prueba")) import("./prueba.js?v=202611021636").then((m) => m.abrirPrueba());

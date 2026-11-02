@@ -215,8 +215,8 @@ export function sonidoCarita(nivel, conVibracion = true) {
 export function sonidoToque(conVibracion = true) {
   if (conVibracion) haptico([28]);
   if (!audioActivo()) return cuandoSuene(() => sonidoToque(false));
-  roce(0, 0.05, 4200, 0.012);
-  gota(1318.5, 0.004, 0.035, 0.12);
+  roce(0, 0.1, 4200, 0.012);
+  gota(1318.5, 0.004, 0.13, 0.12);
 }
 
 // ---------- Kit de sonidos de la interfaz (sintetizados) ----------
@@ -245,14 +245,15 @@ function soplo(cuando, desde, hasta, largo, volumen, tipo = "bandpass") {
   fuente.start(t);
 }
 
-// Golpe de madera suave (selecciones): grave, seco y sin brillo, nada de "ping pong".
-function madera(cuando, volumen = 0.12, tono = 420) {
+// Golpe de madera suave (selecciones): seco y sin brillo, nada de "ping pong". Medio-agudo: la bocina del
+// celular casi no reproduce graves (abajo de ~500 Hz se pierde).
+function madera(cuando, volumen = 0.3, tono = 980) {
   const t = ctx.currentTime + cuando;
   const osc = ctx.createOscillator();
   const env = ctx.createGain();
   const filtro = ctx.createBiquadFilter();
   filtro.type = "lowpass";
-  filtro.frequency.value = 1300;
+  filtro.frequency.value = tono * 2.6;
   osc.type = "triangle";
   osc.frequency.setValueAtTime(tono, t);
   osc.frequency.exponentialRampToValueAtTime(tono * 0.72, t + 0.05);
@@ -262,7 +263,7 @@ function madera(cuando, volumen = 0.12, tono = 420) {
   osc.connect(filtro).connect(env).connect(salidaGeneral);
   osc.start(t);
   osc.stop(t + 0.12);
-  roce(cuando, volumen * 0.25, 2200, 0.01);
+  roce(cuando, volumen * 0.3, 2600, 0.01);
 }
 
 // Campana pequeña (parciales inarmónicos, cola larga).
@@ -316,14 +317,14 @@ function pitido(frecuencia, cuando, largo, volumen) {
 }
 
 const EFECTOS = {
-  toque: () => { roce(0, 0.035, 3000, 0.01); gota(880, 0.002, 0.025, 0.08); },
+  toque: () => { roce(0, 0.1, 3000, 0.01); gota(1318.5, 0.002, 0.14, 0.11); },
   seleccion: () => madera(0),
   abrir: () => { soplo(0, 500, 2400, 0.24, 0.05); gota(659, 0.07, 0.03, 0.35); gota(988, 0.12, 0.03, 0.45); },
   agregar: () => { roce(0, 0.03); gota(784, 0, 0.07, 0.35); gota(1175, 0.075, 0.08, 0.55); },
-  llega: () => burbuja(240, 0, 0.12),
-  quitar: () => { gota(784, 0, 0.045, 0.22); gota(523, 0.06, 0.045, 0.3); },
-  mas: () => { roce(0, 0.03, 4000, 0.008); gota(1046.5, 0, 0.035, 0.1); },
-  menos: () => { roce(0, 0.03, 3200, 0.008); gota(880, 0, 0.035, 0.1); },
+  llega: () => burbuja(560, 0, 0.32),
+  quitar: () => { gota(784, 0, 0.08, 0.22); gota(587.3, 0.06, 0.08, 0.3); },
+  mas: () => { roce(0, 0.08, 4000, 0.008); gota(1568, 0, 0.13, 0.11); },
+  menos: () => { roce(0, 0.08, 3200, 0.008); gota(1174.7, 0, 0.13, 0.11); },
   enviar: () => {
     soplo(0, 3200, 700, 0.26, 0.05, "lowpass"); // el ticket sale a cocina
     [1046.5, 1318.5, 1568].forEach((f, i) => gota(f, 0.14 + i * 0.065, i === 2 ? 0.09 : 0.06, i === 2 ? 0.7 : 0.35));
@@ -337,7 +338,7 @@ const EFECTOS = {
   },
   "pago-efectivo": () => { moneda(0, 0.03); moneda(0.09, 0.025); moneda(0.17, 0.03); gota(1046.5, 0.3, 0.05, 0.5); },
   "pago-en-linea": () => { soplo(0, 700, 3000, 0.2, 0.045); gota(1046.5, 0.15, 0.05, 0.4); gota(1568, 0.23, 0.07, 0.65); },
-  billete: () => { soplo(0, 2600, 1500, 0.06, 0.07); madera(0.01, 0.04, 600); },
+  billete: () => { soplo(0, 2600, 1500, 0.07, 0.22); madera(0.01, 0.16, 820); },
   nfc: () => { gota(1568, 0, 0.045, 0.15); gota(2093, 0.1, 0.045, 0.25); },
   publicar: () => [1046.5, 1318.5, 1568].forEach((f, i) => gota(f, i * 0.05, 0.05, 0.4)),
 };
@@ -371,13 +372,22 @@ export function efecto(nombre, conVibracion = true) {
   cuandoSuene(() => EFECTOS[nombre]());
 }
 
-// Propina: un clic que sube de tono con el porcentaje.
+// Golpe del logo: el mp3 del video es casi puro grave y en la bocina del celular casi no se oye; esta capa
+// brillante (campanas en Do mayor) suena encima para que el golpe se escuche también en el teléfono.
+export function sonidoLogo(volumen = 1) {
+  if (!audioActivo()) return cuandoSuene(() => sonidoLogo(volumen));
+  roce(0, 0.12 * volumen, 3800, 0.02);
+  campana(1046.5, 0, 0.14 * volumen);
+  campana(1568, 0.06, 0.1 * volumen);
+  gota(2093, 0.12, 0.08 * volumen, 0.9);
+}
+
 // Propina: cada punto da un clic que se siente más fuerte cuanto más alta la propina; cada 5 % un "tope" marcado.
 export function sonidoPropina(porcentaje, conVibracion = true) {
   if (conVibracion) haptico(porcentaje % 5 === 0 ? [55 + porcentaje * 2] : [22 + porcentaje]);
   if (!audioActivo()) return cuandoSuene(() => sonidoPropina(porcentaje, false));
-  roce(0, 0.03, 4500, 0.008);
-  gota(700 + porcentaje * 22, 0, 0.022, 0.07);
+  roce(0, 0.09, 4500, 0.008);
+  gota(1000 + porcentaje * 25, 0, 0.16, 0.08);
 }
 
 // ---------- Vibración ----------
