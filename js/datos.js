@@ -15,7 +15,7 @@ export const PLATILLOS = [
     id: "hamburguesa",
     categoria: "fuertes",
     nombre: "Hamburguesa con papas",
-    descripcion: "Carne de res a la parrilla, queso cheddar, lechuga, jitomate y papas a la francesa.",
+    descripcion: "Doble carne de res a la parrilla, cheddar, tocino, aros de cebolla, lechuga y papas a la francesa.",
     precio: 189,
     foto: "img/hamburguesa.jpg",
     modelo: "modelos/fuerte_hamburguesa.glb",
@@ -23,6 +23,8 @@ export const PLATILLOS = [
     kcal: 950,
     carbohidratos: "95 g",
     carne: "120 g",
+    contiene: "Gluten, lácteos",
+    ingredientes: [["🍞","Pan brioche"],["🥩","Carne de res"],["🧀","Queso cheddar"],["🥓","Tocino"],["🧅","Aros de cebolla"],["🥬","Lechuga"],["🍅","Jitomate"],["🍟","Papas"]],
   },
   {
     id: "pasta",
@@ -36,6 +38,8 @@ export const PLATILLOS = [
     kcal: 560,
     carbohidratos: "70 g",
     carne: "80 g",
+    contiene: "Gluten, lácteos",
+    ingredientes: [["🍝","Spaghetti"],["🥩","Res molida"],["🍅","Salsa de jitomate"],["🧄","Ajo"],["🧀","Parmesano"],["🌿","Albahaca"]],
   },
   {
     id: "ensalada",
@@ -49,6 +53,8 @@ export const PLATILLOS = [
     kcal: 220,
     carbohidratos: "15 g",
     carne: "Sin carne",
+    contiene: "Sin alérgenos comunes",
+    ingredientes: [["🥬","Lechugas"],["🍅","Jitomate cherry"],["🥒","Pepino"],["🥑","Aguacate"],["🫒","Vinagreta de oliva"]],
   },
   {
     id: "pastel",
@@ -62,7 +68,16 @@ export const PLATILLOS = [
     kcal: 450,
     carbohidratos: "55 g",
     carne: "Sin carne",
+    contiene: "Gluten, lácteos, huevo",
+    ingredientes: [["🍫","Chocolate"],["🌾","Harina"],["🥚","Huevo"],["🧈","Mantequilla"],["🥛","Leche"]],
   },
 ];
 
-export const PROPINAS = [0, 10, 15, 20];
+// La propina se elige libremente con un deslizador, de 0 a 30 %.
+export const PROPINA_INICIAL = 15;
+export const MAX_PERSONAS = 10;
+
+export const ALERGIAS = ["Gluten", "Lácteos", "Huevo", "Nueces", "Mariscos", "Soya"];
+
+// Enlace para dejar reseña en Google. Cambiarlo por el del restaurante real (Google Business → "Pedir reseñas").
+export const RESENA_GOOGLE = "https://www.google.com/search?q=Chefi+restaurante";

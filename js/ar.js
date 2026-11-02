@@ -31,6 +31,14 @@ export function montarVisor(contenedor, platillo) {
   return visor;
 }
 
+// Regresa el platillo a su lugar y a la vista inicial (después de que "se cayó").
+export function reiniciarVisor() {
+  if (!visor) return;
+  visor.setAttribute("camera-orbit", "30deg 60deg auto");
+  visor.cameraOrbit = "30deg 60deg auto";
+  visor.jumpCameraToGoal();
+}
+
 // true si el celular puede abrir la cámara en AR. En computadora casi siempre es false.
 export function arDisponible() {
   return Boolean(visor && visor.canActivateAR);
