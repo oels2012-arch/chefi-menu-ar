@@ -18,7 +18,10 @@ function quitarPlastico() {
     if (pbr.baseColorTexture?.texture) {
       pbr.metallicRoughnessTexture?.setTexture(null);
       pbr.setRoughnessFactor(0.74);
-    } else pbr.setRoughnessFactor(0.38);
+    } else {
+      pbr.setRoughnessFactor(0.38);
+      pbr.setBaseColorFactor([1, 1, 1, 1]); // plato blanco de cerámica
+    }
   }
 }
 
@@ -63,8 +66,8 @@ export function montarVisor(contenedor, platillo, { alAgregar } = {}) {
     visor.setAttribute("interaction-prompt", "none");
     visor.setAttribute("shadow-intensity", "1.4");
     visor.setAttribute("shadow-softness", "0.85");
-    visor.setAttribute("exposure", "1.05");
-    visor.setAttribute("tone-mapping", "agx");
+    visor.setAttribute("exposure", "1.1");
+    visor.setAttribute("tone-mapping", "neutral");
     visor.setAttribute("camera-orbit", ORBITA);
     visor.setAttribute("min-camera-orbit", "auto 0deg auto");
     visor.setAttribute("max-camera-orbit", "auto 88deg auto");

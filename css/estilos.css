@@ -41,7 +41,7 @@ body {
 body.con-intro { overflow: hidden; }
 
 main {
-  position: relative;
+  position: relative; z-index: 1;
   max-width: 560px;
   margin: 0 auto;
   padding: 14px 16px calc(112px + var(--abajo));
@@ -62,7 +62,7 @@ a { color: inherit; }
 }
 
 /* ---------- Fondo con profundidad ---------- */
-.fondo { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; --ix: 0; --iy: 0; --scroll: 0; }
+.fondo { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; --ix: 0; --iy: 0; --scroll: 0; }
 .mancha {
   position: absolute; width: 70vmax; height: 70vmax; border-radius: 50%; filter: blur(60px); opacity: .5;
   transition: transform .6s ease-out;
