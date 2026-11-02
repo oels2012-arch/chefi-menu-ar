@@ -279,3 +279,25 @@ export function imagenesDeIconos(nombres, lado) {
     img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
   }))).then((pares) => Object.fromEntries(pares.filter(([, img]) => img)));
 }
+
+// Billete dibujado con su color (aproximado al de los billetes mexicanos) y su denominación.
+const COLOR_BILLETE = { 20: "#5BA7C9", 50: "#D96BA0", 100: "#E0533A", 200: "#2E9E6A", 500: "#4A7DBF", 1000: "#8E6BBF" };
+export function billete(valor) {
+  const color = COLOR_BILLETE[valor] ?? G;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 48" class="ico billete-svg" aria-hidden="true">
+    <rect x="1.5" y="1.5" width="93" height="45" rx="6" fill="${color}" stroke="${K}" stroke-width="2"/>
+    <rect x="7" y="7" width="82" height="34" rx="3.5" fill="none" stroke="#fff" stroke-width="1.4" opacity=".55"/>
+    <circle cx="70" cy="24" r="11" fill="#fff" opacity=".28"/>
+    <path d="M11 37c8-4 14-4 22 0" fill="none" stroke="#fff" stroke-width="1.4" stroke-linecap="round" opacity=".5"/>
+    <text x="12" y="23" font-family="Unbounded, Arial Black, sans-serif" font-weight="700" font-size="${valor >= 1000 ? 12 : 14}" fill="#fff">$${valor}</text>
+  </svg>`;
+}
+
+// Moneda con su valor.
+export function monedaSvg(valor) {
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" class="ico moneda-svg" aria-hidden="true">
+    <circle cx="24" cy="24" r="21" fill="${valor >= 10 ? "#D9D2C5" : Y}" stroke="${K}" stroke-width="2"/>
+    <circle cx="24" cy="24" r="15.5" fill="none" stroke="${valor >= 10 ? "#A99F8F" : "#C99A1E"}" stroke-width="2"/>
+    <text x="24" y="29.5" text-anchor="middle" font-family="Unbounded, Arial Black, sans-serif" font-weight="700" font-size="14" fill="${K}">${valor}</text>
+  </svg>`;
+}

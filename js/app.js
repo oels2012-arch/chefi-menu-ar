@@ -4,8 +4,8 @@
 import { CATEGORIAS, PLATILLOS, PROPINA_INICIAL, MAX_PERSONAS, ALERGIAS, MESERO, RESENA_GOOGLE, NIVELES, CALIFICAR, ASPECTOS_CHEF } from "./datos.js";
 import { montarVisor, verEnMiMesa, reiniciarVisor } from "./ar.js";
 import { vigilarSacudida, lluviaDeIngredientes } from "./caida.js";
-import { prepararAudio, desbloquearAudio, sonar, vibrar, sentir, sonidoEstrella, sonidoCarita, sonidoToque } from "./sonido.js";
-import { icono, carita } from "./iconos.js";
+import { prepararAudio, desbloquearAudio, sonar, vibrar, sentir, efecto, sonidoEstrella, sonidoCarita, sonidoToque, sonidoPropina } from "./sonido.js";
+import { icono, carita, billete, monedaSvg } from "./iconos.js";
 import { iniciarIntro } from "./intro.js";
 import { iniciarFondo, pedirMovimiento } from "./fondo.js";
 
@@ -35,6 +35,9 @@ const estado = {
   pedidoEn: null, // hora en que se pidió (para recibido → preparando → en tu mesa)
   etapaVista: -1,
   propina: PROPINA_INICIAL,
+  propinas: {}, // propina de cada persona (índice → %), si la cambió
+  pagaCon: 0, // en efectivo: opción elegida en la barra de billetes
+  ultimoPago: null,
   dividir: "iguales",
   personasIguales: 1,
   quienPaga: 0, // en "lo que consumí": índice de la persona que paga ahora (-1 = toda la mesa)
@@ -317,7 +320,8 @@ function agregar({ desdeRA = false } = {}) {
   const para = conAmigos() && estado.grupo.modo === "consumo" ? estado.para : 0;
   estado.pedido.push({ id: estado.actual, cantidad: estado.cantidad, notas, para });
   const p = platillo(estado.actual);
-  sentir("success", [30, 40, 70], 0.7);
+  efecto("agregar");
+  vibrar([30, 40, 70]);
   if (!desdeRA) volarAlPedido(p.foto);
   avisar(`${p.nombre} se agregó a tu pedido`);
   guardar();
@@ -349,7 +353,7 @@ function volarAlPedido(foto) {
     img.remove();
     const barra = ref("barra-pedido");
     reanimar(barra, "brinco");
-    sonar("pop3", 0.5);
+    efecto("llega");
   });
 }
 
@@ -460,26 +464,65 @@ function revisarEtapa() {
   if (etapa <= estado.etapaVista) return;
   estado.etapaVista = etapa;
   guardar();
-  if (etapa === 1) sentir("shimmer", [60, 40, 60], 0.6);
-  if (etapa === 2) sentir("bell", [220, 90, 220, 90, 320], 0.9);
+  if (etapa === 1) { efecto("preparando"); vibrar([60, 40, 60]); }
+  if (etapa === 2) { efecto("en-mesa"); vibrar([220, 90, 220, 90, 320]); }
   if (vistaActual() === "estado") pintarEstado(true);
   else if (etapa > 0) avisar(etapa === 2 ? "¡Tu pedido ya está en tu mesa!" : "Están preparando tus alimentos", etapa === 2 ? "en-mesa" : "preparando");
 }
 
 // ---------- 7–8. Pago y cuenta ----------
+// Cada quien puede dejar su propia propina. Con tarjeta la propina se elige en la terminal; en efectivo se elige
+// el billete y se ve cuánto dejar y cuánto le regresan.
 
-const montoPropina = () => Math.round(suma(estado.enviados) * estado.propina) / 100;
-const totalCuenta = () => suma(estado.enviados) + montoPropina();
+const propinaLibre = () => estado.metodo !== "tarjeta";
+const pctDe = (i) => (i >= 0 ? estado.propinas[i] ?? estado.propina : estado.propina);
+const nombreDe = (i) => personas()[i] ?? `Persona ${i + 1}`;
 
-// Lo que le toca a cada persona en "lo que consumí": lo suyo + su parte de lo compartido, más propina.
-function reparto() {
+// Lo que consume cada quien (sin propina): partes iguales o lo suyo + su parte de lo compartido.
+function bases() {
+  const consumo = suma(estado.enviados);
+  if (estado.dividir !== "consumo") return Array(estado.personasIguales).fill(consumo / estado.personasIguales);
   const n = personas().length;
-  const consumo = Array(n).fill(0);
+  const c = Array(n).fill(0);
   for (const l of estado.enviados) {
-    if (l.para >= 0 && l.para < n) consumo[l.para] += importe(l);
-    else consumo.forEach((_, i) => (consumo[i] += importe(l) / n));
+    if (l.para >= 0 && l.para < n) c[l.para] += importe(l);
+    else c.forEach((_, i) => (c[i] += importe(l) / n));
   }
-  return consumo.map((c) => c * (1 + estado.propina / 100));
+  return c;
+}
+
+function cuentas() {
+  return bases().map((base, i) => {
+    const propina = propinaLibre() ? Math.round(base * pctDe(i)) / 100 : 0;
+    return { base, propina, pct: pctDe(i), total: base + propina };
+  });
+}
+
+// Lo que paga quien paga ahora (una persona o toda la mesa).
+function aPagar() {
+  const cs = cuentas();
+  if (estado.quienPaga >= cs.length) estado.quienPaga = 0;
+  const q = cs.length > 1 ? estado.quienPaga : -1;
+  if (q >= 0) return { ...cs[q], quien: q, nombre: nombreDe(q) };
+  const base = cs.reduce((s, c) => s + c.base, 0);
+  const propina = cs.reduce((s, c) => s + c.propina, 0);
+  return { base, propina, total: base + propina, pct: estado.propina, quien: -1, nombre: "Toda la mesa" };
+}
+
+// Efectivo: "exacto" y luego los billetes (o montos redondos) con los que alcanza.
+const BILLETES = [1000, 500, 200, 100, 50, 20];
+function opcionesEfectivo(monto) {
+  const opciones = new Set([Math.ceil(monto)]);
+  for (const b of [50, 100, 200, 500, 1000]) opciones.add(Math.ceil((monto + 0.001) / b) * b);
+  return [...opciones].filter((v) => v <= monto + 1000).sort((x, y) => x - y).slice(0, 6);
+}
+// Cómo juntar un monto con billetes (y monedas para lo que sobra).
+function desglosar(monto) {
+  const piezas = [];
+  let resto = Math.round(monto);
+  for (const b of BILLETES) while (resto >= b) { piezas.push(b); resto -= b; }
+  for (const m of [10, 5, 2, 1]) while (resto >= m) { piezas.push(m); resto -= m; }
+  return piezas;
 }
 
 function pintarPago() {
@@ -490,16 +533,9 @@ function pintarPago() {
 
 function pintarCuenta() {
   texto("subtotal", dinero.format(suma(estado.enviados)));
-  ref("propina-rango").value = estado.propina;
-  texto("metodo-resumen", `Pagas con: ${METODOS[estado.metodo] || ""}`);
-  pintarPropina();
-}
-
-function pintarPropina() {
-  const rango = ref("propina-rango");
-  rango.style.setProperty("--avance", `${(estado.propina / Number(rango.max)) * 100}%`);
-  texto("propina-valor", estado.propina ? `${estado.propina}%` : "Sin propina");
-  texto("propina-monto", `${dinero.format(montoPropina())} de propina para el equipo de servicio`);
+  const metodo = estado.metodo;
+  ref("metodo-resumen").innerHTML = `${icono(metodo)}<span>Pagas con ${METODOS[metodo] || ""}</span>`;
+  texto("titulo-cuenta", { efectivo: "Cuenta en efectivo", tarjeta: "Cuenta con tarjeta", "en-linea": "Cuenta clara" }[metodo]);
   pintarDivision();
 }
 
@@ -511,72 +547,108 @@ function pintarDivision() {
   });
   ref("panel-iguales").hidden = consumo;
   ref("panel-consumo").hidden = !consumo;
+  texto("personas", estado.personasIguales);
 
-  const total = totalCuenta();
-  texto("total-cuenta", dinero.format(total));
-  if (!consumo) {
-    const n = estado.personasIguales;
-    texto("personas", n);
-    lista("comensales").replaceChildren(...Array.from({ length: n }, (_, i) => {
-      const c = document.createElement("span");
-      c.className = "comensal";
-      avatar(c, i);
-      c.title = personas()[i] ?? `Persona ${i + 1}`;
-      c.style.animationDelay = `${i * 40}ms`;
-      return c;
+  if (consumo) {
+    lista("asignar").replaceChildren(...estado.enviados.map((l, i) => {
+      const fila = copiar("asignacion");
+      fila.querySelector(".asignacion-nombre").textContent = `${l.cantidad}× ${platillo(l.id).nombre} · ${dinero.format(importe(l))}`;
+      const chip = fila.querySelector(".chip-persona");
+      chip.dataset.indice = i;
+      chip.textContent = l.para >= 0 ? personas()[l.para] ?? "Tú" : "Entre todos";
+      chip.style.setProperty("--color", l.para >= 0 ? COLORES_PERSONA[l.para % COLORES_PERSONA.length] : "#6E6259");
+      return fila;
     }));
-    texto("por-persona", n > 1 ? `Cada quien paga ${dinero.format(total / n)}` : "");
-    texto("boton-pagar", n > 1 ? `mi parte · ${dinero.format(total / n)}` : dinero.format(total));
-    ref("aviso-nfc").hidden = n < 2;
-    return;
   }
 
-  // Lo que consumí: cada platillo con su dueño (se cambia tocando) y el reparto por persona.
-  lista("asignar").replaceChildren(...estado.enviados.map((l, i) => {
-    const fila = copiar("asignacion");
-    fila.querySelector(".asignacion-nombre").textContent = `${l.cantidad}× ${platillo(l.id).nombre} · ${dinero.format(importe(l))}`;
-    const chip = fila.querySelector(".chip-persona");
-    chip.dataset.indice = i;
-    chip.textContent = l.para >= 0 ? personas()[l.para] ?? "Tú" : "Entre todos";
-    chip.style.setProperty("--color", l.para >= 0 ? COLORES_PERSONA[l.para % COLORES_PERSONA.length] : "#6E6259");
-    return fila;
-  }));
-  const montos = reparto();
-  const filas = personas().map((nombre, i) => {
-    const fila = copiar("reparto");
-    fila.dataset.valor = i;
-    avatar(fila.querySelector(".persona-avatar"), i);
-    fila.querySelector(".reparto-nombre").textContent = nombre === "Tú" ? "Tú" : nombre;
-    const cuantos = estado.enviados.filter((l) => l.para === i).reduce((s, l) => s + l.cantidad, 0);
-    fila.querySelector(".reparto-detalle").textContent = `${cuantos} platillo${cuantos === 1 ? "" : "s"}`;
-    fila.querySelector(".reparto-monto").textContent = dinero.format(montos[i]);
-    fila.classList.toggle("activo", estado.quienPaga === i);
-    return fila;
-  });
-  const todos = copiar("reparto");
-  todos.dataset.valor = -1;
-  const avatarTodos = todos.querySelector(".persona-avatar");
-  avatarTodos.innerHTML = icono("grupo");
-  avatarTodos.style.background = "var(--carbon)";
-  todos.querySelector(".reparto-nombre").textContent = "Toda la mesa";
-  todos.querySelector(".reparto-detalle").textContent = "una sola persona paga";
-  todos.querySelector(".reparto-monto").textContent = dinero.format(total);
-  todos.classList.toggle("activo", estado.quienPaga === -1);
-  lista("reparto").replaceChildren(...filas, todos);
+  // Quién paga ahora: cada persona con su parte y su propina, o toda la mesa.
+  const cs = cuentas();
+  const pago = aPagar();
+  const varios = cs.length > 1;
+  ref("bloque-quien").hidden = !varios;
+  ref("aviso-nfc").hidden = !varios;
+  if (varios) {
+    const filas = cs.map((c, i) => {
+      const fila = copiar("reparto");
+      fila.dataset.valor = i;
+      avatar(fila.querySelector(".persona-avatar"), i);
+      fila.querySelector(".reparto-nombre").textContent = nombreDe(i);
+      const que = consumo
+        ? (() => { const n = estado.enviados.filter((l) => l.para === i).reduce((s, l) => s + l.cantidad, 0); return `${n} platillo${n === 1 ? "" : "s"}`; })()
+        : "parte igual";
+      fila.querySelector(".reparto-detalle").textContent = propinaLibre() ? `${que} · propina ${c.pct}%` : `${que} · + propina en la terminal`;
+      fila.querySelector(".reparto-monto").textContent = dinero.format(c.total);
+      fila.classList.toggle("activo", pago.quien === i);
+      return fila;
+    });
+    const todos = copiar("reparto");
+    todos.dataset.valor = -1;
+    const avatarTodos = todos.querySelector(".persona-avatar");
+    avatarTodos.innerHTML = icono("grupo");
+    avatarTodos.style.background = "var(--carbon)";
+    todos.querySelector(".reparto-nombre").textContent = "Toda la mesa";
+    todos.querySelector(".reparto-detalle").textContent = "una sola persona paga todo";
+    todos.querySelector(".reparto-monto").textContent = dinero.format(cs.reduce((s, c) => s + c.total, 0));
+    todos.classList.toggle("activo", pago.quien === -1);
+    lista("reparto").replaceChildren(...filas, todos);
+  }
 
-  const quien = estado.quienPaga;
-  const monto = quien >= 0 ? montos[quien] : total;
-  texto("por-persona", "");
-  texto("boton-pagar", quien >= 0 ? `${quien === 0 ? "lo mío" : `lo de ${personas()[quien]}`} · ${dinero.format(monto)}` : `todo · ${dinero.format(total)}`);
-  ref("aviso-nfc").hidden = !conAmigos();
+  // Propina de quien paga ahora (con tarjeta la elige la terminal).
+  ref("bloque-propina").hidden = !propinaLibre();
+  ref("aviso-terminal").hidden = propinaLibre();
+  if (propinaLibre()) {
+    const rango = ref("propina-rango");
+    rango.value = pago.pct;
+    rango.style.setProperty("--avance", `${(pago.pct / Number(rango.max)) * 100}%`);
+    texto("propina-quien", !varios || pago.quien === 0 ? "Tu propina" : pago.quien === -1 ? "Propina de toda la mesa" : `Propina de ${pago.nombre}`);
+    texto("propina-valor", pago.pct ? `${pago.pct}%` : "Sin propina");
+    texto("propina-monto", `${dinero.format(pago.propina)} de propina sobre ${dinero.format(pago.base)} de consumo`);
+  }
+
+  pintarEfectivo(pago);
+
+  const quien = !varios ? "" : pago.quien === -1 ? "todo" : pago.quien === 0 ? "lo mío" : `lo de ${pago.nombre}`;
+  texto("total-etiqueta", varios && pago.quien !== -1 ? `Paga ${pago.nombre === "Tú" ? "tú" : pago.nombre}` : "Total");
+  texto("total-cuenta", dinero.format(pago.total));
+  texto("por-persona", estado.metodo === "tarjeta" ? "+ la propina que elijas en la terminal" : "");
+  const verbo = { efectivo: "Listo, pago en efectivo", tarjeta: "Pedir la terminal", "en-linea": "Pagar" }[estado.metodo];
+  texto("boton-pagar", `${verbo}${quien ? ` ${quien}` : ""} · ${dinero.format(pago.total)}`);
+}
+
+// Efectivo: barra para elegir el billete, los billetes dibujados y cuánto dejar, de propina y de cambio.
+function pintarEfectivo(pago = aPagar()) {
+  const bloque = ref("bloque-efectivo");
+  bloque.hidden = estado.metodo !== "efectivo";
+  if (bloque.hidden) return;
+  const opciones = opcionesEfectivo(pago.total);
+  estado.pagaCon = Math.min(estado.pagaCon ?? 0, opciones.length - 1);
+  const rango = ref("billete-rango");
+  rango.max = opciones.length - 1;
+  rango.value = estado.pagaCon;
+  rango.style.setProperty("--avance", `${opciones.length > 1 ? (estado.pagaCon / (opciones.length - 1)) * 100 : 100}%`);
+  lista("marcas-billete").replaceChildren(...opciones.map((v, i) => {
+    const m = document.createElement("span");
+    m.textContent = i === 0 ? "Exacto" : `$${v}`;
+    m.classList.toggle("activo", i === estado.pagaCon);
+    return m;
+  }));
+  const con = opciones[estado.pagaCon];
+  const cambio = con - pago.total;
+  texto("paga-con", estado.pagaCon === 0 ? "Exacto" : `$${con}`);
+  const piezas = desglosar(con);
+  ref("billetes").innerHTML = piezas.map((v, i) => `<span class="billete-pieza" style="--i:${i}">${v >= 20 ? billete(v) : monedaSvg(v)}</span>`).join("");
+  ref("desglose").innerHTML = `
+    <div><dt>Consumo</dt><dd>${dinero.format(pago.base)}</dd></div>
+    <div><dt>Propina (${pago.pct}%)</dt><dd>${dinero.format(pago.propina)}</dd></div>
+    <div class="fuerte"><dt>Total a dejar</dt><dd>${dinero.format(pago.total)}</dd></div>
+    <div><dt>Pagas con</dt><dd>${dinero.format(con)}</dd></div>
+    <div class="cambio"><dt>Te regresan</dt><dd>${dinero.format(Math.max(0, cambio))}</dd></div>`;
 }
 
 // ---------- 9. Gracias ----------
 
 function pintarGracias() {
-  const mensajes = { tarjeta: "Un mesero llevará la terminal a tu mesa.", efectivo: "Un mesero pasará a cobrar a tu mesa.",
-                     "en-linea": "Tu pago en línea quedó registrado." };
-  texto("metodo-elegido", mensajes[estado.metodo] || "");
+  pintarAvisoPago();
   texto("mesero-nombre", MESERO.nombre);
   pintarCalificacion("mesero");
   pintarCalificacion("chef");
@@ -585,6 +657,29 @@ function pintarGracias() {
   pintarEstrellas(lista("encuesta-menu"), estado.encuestaMenu);
   pintarEstrellas(lista("estrellas-google"), estado.google);
   pintarGraciasEncuesta();
+}
+
+// Mensaje grande según cómo pagó: qué va a pasar y, en efectivo, qué tener listo.
+function pintarAvisoPago() {
+  const u = estado.ultimoPago ?? { metodo: estado.metodo };
+  const titulos = { efectivo: "Un mesero irá a tu mesa en un momento", tarjeta: "Un mesero irá con la terminal",
+                    "en-linea": "¡Tu pago quedó listo!" };
+  ref("aviso-pago").dataset.metodo = u.metodo;
+  ref("aviso-pago-icono").innerHTML = icono(u.metodo === "en-linea" ? "en-linea" : u.metodo === "tarjeta" ? "tarjeta" : "efectivo");
+  texto("aviso-pago-titulo", titulos[u.metodo] ?? "");
+  const fila = (dt, dd, clase = "") => `<div class="${clase}"><dt>${dt}</dt><dd>${dd}</dd></div>`;
+  let detalle = "";
+  if (u.total != null) {
+    if (u.metodo === "efectivo") {
+      detalle = fila("Ten listos", dinero.format(u.con), "fuerte") + fila("Ya incluye de propina", dinero.format(u.propina)) +
+        fila("Te regresan", dinero.format(Math.max(0, u.con - u.total)), "cambio");
+    } else if (u.metodo === "tarjeta") {
+      detalle = fila("Se cobra", dinero.format(u.total), "fuerte") + `<p class="nota">La propina la eliges en la terminal.</p>`;
+    } else {
+      detalle = fila("Pagaste", dinero.format(u.total), "fuerte") + fila("Propina incluida", dinero.format(u.propina));
+    }
+  }
+  ref("aviso-pago-detalle").innerHTML = detalle;
 }
 
 function pintarGraciasEncuesta() {
@@ -704,32 +799,36 @@ const acciones = {
     estado.grupo = { personas: ["Tú"], modo: "iguales" };
     estado.personasIguales = 1;
     estado.dividir = "iguales";
-    sentir("pop3", 15);
+    efecto("seleccion");
+    vibrar(15);
     ir("menu");
   },
   "grupo-amigos": () => {
     ref("opcion-amigos").classList.add("activo");
     ref("grupo").hidden = false;
-    sentir("pop3", 15);
+    efecto("seleccion");
+    vibrar(15);
     pintarMesa();
     ref("nombre-persona").focus();
   },
   "quitar-persona": (el) => {
     estado.grupo.personas.splice(Number(el.dataset.indice), 1);
-    sonar("pop2", 0.4);
+    delete estado.propinas[Number(el.dataset.indice)];
+    efecto("quitar");
     pintarMesa();
   },
   modo: (el) => {
     estado.grupo.modo = el.dataset.valor;
     estado.dividir = el.dataset.valor;
-    sentir("pop3", 15);
+    efecto("seleccion");
+    vibrar(15);
     pintarMesa();
   },
-  categoria: (el) => { estado.categoria = el.dataset.id; sonar("swipe", 0.4); pintarMenu(); },
-  "abrir-platillo": (el) => { sonar("whoosh1", 0.35); ir(`platillo/${el.dataset.id}`); },
-  "ver-en-mi-mesa": () => { sentir("shimmer", 20, 0.5); ref("aviso-ar").hidden = verEnMiMesa(); },
-  mas: () => { estado.cantidad++; sentir("tick", 10, 0.6); pintarCantidad(); },
-  menos: () => { estado.cantidad = Math.max(1, estado.cantidad - 1); sentir("tick", 10, 0.6); pintarCantidad(); },
+  categoria: (el) => { estado.categoria = el.dataset.id; efecto("seleccion"); pintarMenu(); },
+  "abrir-platillo": (el) => { efecto("abrir"); ir(`platillo/${el.dataset.id}`); },
+  "ver-en-mi-mesa": () => { efecto("abrir"); vibrar(20); ref("aviso-ar").hidden = verEnMiMesa(); },
+  mas: () => { estado.cantidad++; efecto("mas"); vibrar(10); pintarCantidad(); },
+  menos: () => { estado.cantidad = Math.max(1, estado.cantidad - 1); efecto("menos"); vibrar(10); pintarCantidad(); },
   alergia: (el) => {
     const a = el.dataset.valor;
     estado.alergias = estado.alergias.includes(a) ? estado.alergias.filter((x) => x !== a) : [...estado.alergias, a];
@@ -737,42 +836,52 @@ const acciones = {
     pintarAlergias();
     reanimar(lista("alergias").querySelector(`[data-valor="${a}"]`), "rebote");
   },
-  para: (el) => { estado.para = Number(el.dataset.valor); sentir("pop3", 12, 0.45); pintarParaQuien(); },
+  para: (el) => { estado.para = Number(el.dataset.valor); efecto("seleccion"); vibrar(12); pintarParaQuien(); },
   agregar: () => { agregar(); ir("menu"); },
-  quitar: (el) => { estado.pedido.splice(Number(el.dataset.indice), 1); sonar("pop2", 0.45); pintarPedido(); },
+  quitar: (el) => { estado.pedido.splice(Number(el.dataset.indice), 1); efecto("quitar"); pintarPedido(); },
   "enviar-pedido": () => {
     estado.enviados.push(...estado.pedido);
     estado.pedido = [];
     estado.pedidoEn = Date.now();
     estado.etapaVista = 0;
-    sentir("stamp", [90, 50, 160, 50, 90], 0.9);
+    efecto("enviar");
+    vibrar([90, 50, 160, 50, 90]);
     animarSello = true;
     ir("estado");
   },
   "elegir-metodo": () => {
     estado.metodo = document.querySelector('input[name="metodo"]:checked')?.value || "tarjeta";
     if (estado.personasIguales < personas().length) estado.personasIguales = personas().length;
-    sonar("tap", 0.4);
+    estado.quienPaga = conAmigos() ? 0 : -1;
+    estado.pagaCon = 0;
+    efecto("seleccion");
     ir("cuenta");
   },
-  dividir: (el) => { estado.dividir = el.dataset.valor; sentir("swipe", 12, 0.45); pintarDivision(); },
+  dividir: (el) => { estado.dividir = el.dataset.valor; efecto("seleccion"); vibrar(12); pintarDivision(); },
   "mas-personas": () => {
     estado.personasIguales = Math.min(MAX_PERSONAS, estado.personasIguales + 1);
-    sentir("pop2", 12, 0.5);
-    if (estado.personasIguales === 2) sonar("nfc", 0.5);
+    efecto("mas");
+    vibrar(12);
+    if (estado.personasIguales === 2) efecto("nfc");
     pintarDivision();
   },
-  "menos-personas": () => { estado.personasIguales = Math.max(1, estado.personasIguales - 1); sentir("pop2", 12, 0.5); pintarDivision(); },
+  "menos-personas": () => { estado.personasIguales = Math.max(1, estado.personasIguales - 1); efecto("menos"); vibrar(12); pintarDivision(); },
   asignar: (el) => {
     const l = estado.enviados[Number(el.dataset.indice)];
     const n = personas().length;
     l.para = l.para >= n - 1 ? -1 : l.para + 1; // Tú → amigos → "Entre todos" → Tú
-    sentir("pop3", 12, 0.45);
+    efecto("seleccion");
+    vibrar(12);
     pintarDivision();
   },
-  "quien-paga": (el) => { estado.quienPaga = Number(el.dataset.valor); sentir("tick", 10, 0.5); pintarDivision(); },
+  "quien-paga": (el) => { estado.quienPaga = Number(el.dataset.valor); estado.pagaCon = 0; efecto("seleccion"); vibrar(10); pintarDivision(); },
   pagar: () => {
-    sentir("pay2", [60, 40, 140], 0.8);
+    const pago = aPagar();
+    const con = estado.metodo === "efectivo" ? opcionesEfectivo(pago.total)[estado.pagaCon] : null;
+    estado.ultimoPago = { metodo: estado.metodo, total: pago.total, propina: pago.propina, con };
+    efecto(`pago-${estado.metodo}`);
+    vibrar(estado.metodo === "tarjeta" ? [40, 120, 60] : [60, 40, 140]);
+    estado.propinas = {};
     estado.enviados = [];
     estado.pedidoEn = null;
     estado.calif = { mesero: null, chef: null, motivos: { mesero: [], chef: [] }, aspectos: {} };
@@ -815,16 +924,17 @@ const acciones = {
   "publicar-google": () => {
     const resena = ref("texto-google").value.trim();
     if (resena) navigator.clipboard?.writeText(resena).catch(() => {});
-    sentir("success", 20, 0.5);
+    efecto("publicar");
+    vibrar(20);
     window.open(RESENA_GOOGLE, "_blank", "noopener");
   },
-  "volver-a-servir": () => { cerrarCaida(); reiniciarVisor(); sonar("whoosh1", 0.4); },
+  "volver-a-servir": () => { cerrarCaida(); reiniciarVisor(); efecto("abrir"); },
 };
 
 document.addEventListener("click", (evento) => {
   const el = evento.target.closest("[data-accion]");
   if (!el || !acciones[el.dataset.accion]) return;
-  if (["ir", "atras", "opcion"].includes(el.dataset.accion)) sonar("tap", 0.35);
+  if (["ir", "atras", "opcion"].includes(el.dataset.accion)) efecto("toque");
   acciones[el.dataset.accion](el);
   guardar();
   pintarBarra();
@@ -849,24 +959,42 @@ ref("form-persona").addEventListener("submit", (evento) => {
   if (!nombre || personas().length >= MAX_PERSONAS) return;
   estado.grupo.personas.push(nombre[0].toUpperCase() + nombre.slice(1));
   campo.value = "";
-  sentir("pop3", 15, 0.5);
+  efecto("agregar");
+  vibrar(15);
   pintarMesa();
   guardar();
 });
 
 // Deslizador de propina: cualquier porcentaje de 0 a 30, con un clic por cada punto.
+// Deslizador de propina: cualquier porcentaje de 0 a 30 para quien paga ahora, con un clic por cada punto.
 ref("propina-rango").addEventListener("input", (evento) => {
   const valor = Number(evento.target.value);
-  if (valor !== estado.propina) {
-    sonar("tick", 0.35);
+  const pago = aPagar();
+  if (valor !== pago.pct) {
+    sonidoPropina(valor);
     vibrar(5);
   }
-  estado.propina = valor;
-  pintarPropina();
+  if (pago.quien === -1) {
+    estado.propina = valor; // toda la mesa: la misma para todos
+    estado.propinas = {};
+  } else estado.propinas[pago.quien] = valor;
+  pintarDivision();
   guardar();
 });
 
-document.querySelectorAll('input[name="metodo"]').forEach((r) => r.addEventListener("change", () => sentir("tap", 10, 0.4)));
+// Barra de billetes (efectivo).
+ref("billete-rango").addEventListener("input", (evento) => {
+  const valor = Number(evento.target.value);
+  if (valor !== estado.pagaCon) {
+    efecto("billete");
+    vibrar(8);
+  }
+  estado.pagaCon = valor;
+  pintarEfectivo();
+  guardar();
+});
+
+document.querySelectorAll('input[name="metodo"]').forEach((r) => r.addEventListener("change", () => { efecto("seleccion"); vibrar(10); }));
 
 ref("aviso").addEventListener("animationend", (evento) => {
   if (evento.target.classList.contains("saliendo")) evento.target.hidden = true;
@@ -884,6 +1012,7 @@ function pintarIconos(raiz = document) {
 cargar();
 // Un estado guardado por la versión anterior no tiene calificaciones del chef.
 estado.calif ??= { mesero: null, chef: null, motivos: { mesero: [], chef: [] }, aspectos: {} };
+estado.propinas ??= {};
 prepararAudio();
 pintarIconos();
 texto("mesa", estado.mesa ? `Mesa ${estado.mesa}` : "");

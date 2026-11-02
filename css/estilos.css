@@ -26,7 +26,8 @@
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 [hidden] { display: none !important; }
-html { -webkit-text-size-adjust: 100%; }
+/* clip (no hidden): en celular evita que la cinta y las categorías ensanchen la página, sin romper lo "sticky" */
+html { -webkit-text-size-adjust: 100%; overflow-x: hidden; overflow-x: clip; }
 
 body {
   margin: 0;
@@ -37,6 +38,7 @@ body {
   font-size: 16px;
   line-height: 1.45;
   overflow-x: hidden;
+  overflow-x: clip;
 }
 body.con-intro { overflow: hidden; }
 
@@ -541,11 +543,13 @@ model-viewer[ar-status="session-started"] .etiqueta-ra {
 .alergias { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
 .alergia {
   display: grid; justify-items: center; gap: 6px; padding: 10px 2px 9px; border-radius: 20px; border: 0;
-  background: linear-gradient(180deg, #fffdf9, var(--crema)); color: var(--carbon); font-weight: 600; font-size: .7rem;
+  background: linear-gradient(180deg, #fffdf9, var(--crema)); color: var(--carbon); font: 600 .76rem/1.1 "Fredoka", var(--texto); letter-spacing: .01em;
   box-shadow: 0 1px 0 #fff inset, 0 0 0 1px #1f1f1f12, 0 8px 16px -10px #6e625980, 0 2px 4px -2px #6e625940;
   transition: background .35s ease, box-shadow .35s ease, transform .25s var(--resorte), color .3s;
 }
 .alergia:active { transform: scale(.94); }
+.rotulo-alergia { font: 600 1.08rem "Fredoka", var(--texto); letter-spacing: .01em; }
+[data-ref="otra-alergia"] { font-family: "Fredoka", var(--texto); font-weight: 500; }
 .alergia-icono {
   width: 40px; height: 40px; padding: 4px; border-radius: 14px; background: #fff;
   box-shadow: 0 0 0 1px #1f1f1f0d, 0 3px 8px -4px #6e625966; transition: transform .45s var(--resorte), box-shadow .35s;
@@ -776,15 +780,16 @@ model-viewer[ar-status="session-started"] .etiqueta-ra {
 .estrella svg { width: 100%; height: 100%; overflow: visible; transition: transform .5s var(--resorte); transition-delay: var(--retraso, 0ms); }
 .estrella-fondo { fill: #fffaf3; stroke: #1f1f1f8c; stroke-width: 1.15; stroke-linejoin: round; transition: stroke .3s var(--retraso, 0ms); }
 .estrella-relleno {
-  stroke: #d98a1f; stroke-width: .6; stroke-linejoin: round; transform-box: fill-box; transform-origin: center;
+  stroke: #F2A000; stroke-width: .6; stroke-linejoin: round; transform-box: fill-box; transform-origin: center;
   transform: scale(0); opacity: 0; transition: transform .55s cubic-bezier(.2, .9, .3, 1.25), opacity .2s; transition-delay: var(--retraso, 0ms);
 }
 .estrella-brillo { fill: none; stroke: #fff; stroke-width: 1.2; stroke-linecap: round; opacity: 0; transition: opacity .3s var(--retraso, 0ms); }
-.estrella-chispa { fill: var(--amarillo); opacity: 0; transform-box: fill-box; transform-origin: center; }
-.estrella-halo { position: absolute; inset: 4px; border-radius: 50%; pointer-events: none; opacity: 0; box-shadow: 0 0 0 1.5px #f6c445; }
+.estrella-chispa { fill: #FFC107; opacity: 0; transform-box: fill-box; transform-origin: center; }
+.estrella-halo { position: absolute; inset: 4px; border-radius: 50%; pointer-events: none; opacity: 0; box-shadow: 0 0 0 1.5px #FFC107, 0 0 14px #FFC10780; }
 .estrella:active svg { transform: scale(.88); transition-delay: 0ms; }
 .estrella.activo .estrella-fondo { stroke: transparent; }
 .estrella.activo .estrella-relleno { transform: none; opacity: 1; }
+.estrella.activo svg { filter: drop-shadow(0 0 5px #FFC10766) drop-shadow(0 2px 2px #F2A00040); }
 .estrella.activo .estrella-brillo { opacity: .85; }
 .estrella.elegida svg { animation: estrella-elegida .6s cubic-bezier(.3, 1.4, .5, 1) both; animation-delay: var(--retraso, 0ms); }
 .estrella.elegida .estrella-chispa { animation: chispa-estrella .8s ease-out both; animation-delay: calc(var(--retraso, 0ms) + 180ms); }
@@ -887,7 +892,7 @@ model-viewer[ar-status="session-started"] .etiqueta-ra {
   .tarjeta-foto img { width: 92px; height: 92px; }
   .nutricion { grid-template-columns: 1fr 1fr; }
   .alergias { gap: 5px; }
-  .alergia { font-size: .6rem; border-radius: 16px; }
+  .alergia { font-size: .66rem; border-radius: 16px; }
   .alergia-icono { width: 34px; height: 34px; }
   .carita-nombre { font-size: .6rem; }
   .estrella { width: 40px; height: 40px; }
@@ -896,3 +901,50 @@ model-viewer[ar-status="session-started"] .etiqueta-ra {
   .etapa-icono { width: 44px; height: 44px; }
   .etapa-via { top: 21px; right: calc(50% + 19px); width: calc(100% - 38px); }
 }
+
+/* ---------- Cuenta: método, terminal y efectivo ---------- */
+.metodo-chip { display: inline-flex; align-items: center; gap: 8px; margin: 0 0 12px; padding: 4px 14px 4px 4px; border-radius: 999px; background: var(--blanco); border: var(--borde); font-weight: 700; font-size: .85rem; }
+.metodo-chip .ico { width: 30px; height: 30px; }
+.rotulo-quien { margin-top: 16px; }
+.aviso-terminal { display: flex; gap: 12px; align-items: center; margin: 14px 0; padding: 14px; border-radius: 20px; background: var(--carbon); color: var(--crema); font-size: .88rem; }
+.aviso-terminal p { margin: 0; }
+.aviso-terminal strong { color: var(--amarillo); }
+.aviso-terminal [data-icono] { flex: none; width: 48px; height: 48px; padding: 4px; border-radius: 14px; background: var(--crema); }
+.valor-propina.verde { background: var(--verde); }
+.billetes { position: relative; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 4px 0; min-height: 66px; margin: 4px 0 8px; padding: 6px 10px; border-radius: 16px; background: var(--crema-2); }
+.billete-pieza { display: block; margin-left: -18px; animation: billete-entra .45s var(--resorte) both; animation-delay: calc(var(--i) * 50ms); }
+.billete-pieza:first-child { margin-left: 0; }
+.billete-pieza .billete-svg { width: 96px; height: 48px; filter: drop-shadow(0 3px 4px #6e625940); transform: rotate(calc((var(--i) - 1) * 4deg)); }
+.billete-pieza .moneda-svg { width: 34px; height: 34px; margin-left: 12px; }
+@keyframes billete-entra { from { opacity: 0; transform: translateY(-16px) rotate(-8deg) scale(.9); } }
+[data-ref="billete-rango"] { background: linear-gradient(90deg, var(--verde) var(--avance, 0%), var(--crema-2) var(--avance, 0%)) !important; }
+[data-lista="marcas-billete"] span { flex: 1; text-align: center; }
+[data-lista="marcas-billete"] span:first-child { text-align: left; }
+[data-lista="marcas-billete"] span:last-child { text-align: right; }
+[data-lista="marcas-billete"] span.activo { color: var(--carbon); }
+.desglose { display: grid; gap: 0; margin: 6px 0 0; }
+.desglose div { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1.5px dashed var(--linea); font-size: .9rem; }
+.desglose div:last-child { border-bottom: 0; }
+.desglose dt { color: var(--gris); }
+.desglose dd { margin: 0; font-weight: 700; }
+.desglose .fuerte dt { color: var(--carbon); font-weight: 700; }
+.desglose .fuerte dd { font: 700 1.05rem var(--titulo); }
+.desglose .cambio dd { color: var(--verde); font: 700 1.05rem var(--titulo); }
+
+/* ---------- Gracias: mensaje grande del pago ---------- */
+.aviso-pago {
+  margin: 8px 0 18px; padding: 22px 18px 16px; border-radius: 28px; text-align: center;
+  background: var(--carbon); color: var(--crema); border: var(--borde); box-shadow: 5px 5px 0 var(--naranja);
+  animation: aviso-pago-entra .7s var(--resorte) both;
+}
+.aviso-pago[data-metodo="efectivo"] { box-shadow: 5px 5px 0 var(--verde); }
+.aviso-pago-icono { display: block; width: 76px; height: 76px; margin: 0 auto 10px; padding: 10px; border-radius: 24px; background: var(--crema); animation: aparecer .6s .2s var(--resorte) both; }
+.aviso-pago-titulo { margin: 0 0 10px; font: 700 clamp(1.35rem, 6.4vw, 1.7rem)/1.12 var(--titulo); letter-spacing: -.02em; }
+.aviso-pago .desglose { text-align: left; }
+.aviso-pago .desglose div { border-color: #fff6ec2e; }
+.aviso-pago .desglose dt { color: #fff6ecb3; }
+.aviso-pago .desglose .fuerte dt { color: var(--crema); }
+.aviso-pago .desglose .cambio dd { color: #7ED9A8; }
+.aviso-pago .nota { margin: 8px 0 0; color: #fff6ecb3; text-align: left; }
+.gracias-titulo { font-size: clamp(1.2rem, 5.4vw, 1.5rem); }
+@keyframes aviso-pago-entra { from { opacity: 0; transform: translateY(24px) scale(.94); } }

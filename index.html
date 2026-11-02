@@ -8,7 +8,7 @@
   <title>Chefi · Menú digital</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;900&family=Inter+Tight:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;900&family=Inter+Tight:wght@400;500;600;700;800&family=Fredoka:wght@500;600&display=swap">
   <link rel="icon" href="img/icono.svg" type="image/svg+xml">
   <link rel="stylesheet" href="css/estilos.css">
   <script type="module" src="https://cdn.jsdelivr.net/npm/@google/model-viewer@3.5.0/dist/model-viewer.min.js"></script>
@@ -36,8 +36,8 @@
   <!-- Degradados compartidos por las estrellas -->
   <svg class="defs" aria-hidden="true" width="0" height="0">
     <defs>
-      <linearGradient id="estrella-chefi" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F8D46A"/><stop offset="1" stop-color="#F2A13A"/></linearGradient>
-      <linearGradient id="estrella-google" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FCC934"/><stop offset="1" stop-color="#FBBC04"/></linearGradient>
+      <linearGradient id="estrella-chefi" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFDA3D"/><stop offset=".55" stop-color="#FFC107"/><stop offset="1" stop-color="#FBAA04"/></linearGradient>
+      <linearGradient id="estrella-google" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFD02B"/><stop offset="1" stop-color="#FBBC04"/></linearGradient>
     </defs>
   </svg>
 
@@ -207,7 +207,7 @@
       <p class="contiene" data-ref="contiene"></p>
 
       <div class="bloque">
-        <p class="rotulo">¿Alguna alergia?</p>
+        <p class="rotulo rotulo-alergia">¿Alguna alergia?</p>
         <div class="alergias" data-lista="alergias"></div>
         <input class="entrada" type="text" data-ref="otra-alergia" placeholder="¿Otra alergia? Escríbela aquí">
         <p class="rotulo">Notas para cocina</p>
@@ -277,15 +277,44 @@
       <button class="boton-principal" data-accion="elegir-metodo">Continuar</button>
     </section>
 
-    <!-- 8. Cuenta clara: propina libre y dividir (partes iguales o por consumo) -->
+    <!-- 8. Cuenta clara: dividir, propina de cada quien y, si es en efectivo, con qué billete paga -->
     <section class="pantalla" data-pantalla="cuenta">
       <p class="antetitulo">Paso 2 de 2</p>
-      <h2>Cuenta clara</h2>
-      <p class="subtotal">Consumo <strong data-ref="subtotal"></strong></p>
+      <h2 data-ref="titulo-cuenta">Cuenta clara</h2>
+      <p class="metodo-chip" data-ref="metodo-resumen"></p>
+      <p class="subtotal">Consumo de la mesa <strong data-ref="subtotal"></strong></p>
 
       <div class="tarjeta-control">
+        <p class="rotulo">Repartir la cuenta</p>
+        <div class="segmentos" role="tablist">
+          <button role="tab" data-accion="dividir" data-valor="iguales">Partes iguales</button>
+          <button role="tab" data-accion="dividir" data-valor="consumo">Lo que consumí</button>
+        </div>
+        <div class="control-encabezado" data-ref="panel-iguales">
+          <p>Entre cuántos</p>
+          <div class="cantidad">
+            <button class="boton-icono" data-accion="menos-personas" aria-label="Menos personas">−</button>
+            <span data-ref="personas">1</span>
+            <button class="boton-icono" data-accion="mas-personas" aria-label="Más personas">+</button>
+          </div>
+        </div>
+        <div data-ref="panel-consumo" hidden>
+          <p class="nota">Toca la persona junto a cada platillo para cambiar quién lo pidió.</p>
+          <div data-lista="asignar"></div>
+        </div>
+        <div data-ref="bloque-quien">
+          <p class="rotulo rotulo-quien">¿Quién paga ahora?</p>
+          <div class="reparto" data-lista="reparto"></div>
+        </div>
+        <div class="aviso-nfc" data-ref="aviso-nfc" hidden>
+          <span class="nfc-icono" aria-hidden="true"><i></i><i></i><i></i></span>
+          <p>Que tus amigos <strong>acerquen su celular a la tarjeta NFC</strong> de la mesa: les sale esta cuenta para pagar <strong>su parte</strong>.</p>
+        </div>
+      </div>
+
+      <div class="tarjeta-control" data-ref="bloque-propina">
         <div class="control-encabezado">
-          <p class="rotulo">Propina</p>
+          <p class="rotulo" data-ref="propina-quien">Propina</p>
           <strong class="valor-propina" data-ref="propina-valor"></strong>
         </div>
         <div class="deslizador">
@@ -295,51 +324,40 @@
         <p class="nota" data-ref="propina-monto"></p>
       </div>
 
-      <div class="tarjeta-control">
-        <p class="rotulo">Dividir la cuenta</p>
-        <div class="segmentos" role="tablist">
-          <button role="tab" data-accion="dividir" data-valor="iguales">Partes iguales</button>
-          <button role="tab" data-accion="dividir" data-valor="consumo">Lo que consumí</button>
-        </div>
-
-        <div data-ref="panel-iguales">
-          <div class="control-encabezado">
-            <p>Total entre</p>
-            <div class="cantidad">
-              <button class="boton-icono" data-accion="menos-personas" aria-label="Menos personas">−</button>
-              <span data-ref="personas">1</span>
-              <button class="boton-icono" data-accion="mas-personas" aria-label="Más personas">+</button>
-            </div>
-          </div>
-          <div class="comensales" data-lista="comensales"></div>
-        </div>
-
-        <div data-ref="panel-consumo" hidden>
-          <p class="nota">Toca la persona junto a cada platillo para cambiar quién lo pidió.</p>
-          <div data-lista="asignar"></div>
-          <div class="reparto" data-lista="reparto"></div>
-        </div>
-
-        <div class="aviso-nfc" data-ref="aviso-nfc" hidden>
-          <span class="nfc-icono" aria-hidden="true"><i></i><i></i><i></i></span>
-          <p>Que tus amigos <strong>acerquen su celular a la tarjeta NFC</strong> de la mesa: les sale esta cuenta para pagar <strong>su parte</strong>.</p>
-        </div>
+      <div class="aviso-terminal" data-ref="aviso-terminal" hidden>
+        <span data-icono="tarjeta"></span>
+        <p><strong>La propina se elige en la terminal.</strong> El mesero te la muestra al cobrar, con las opciones que tiene configuradas. Aquí solo ves tu consumo.</p>
       </div>
 
-      <p class="metodo-resumen" data-ref="metodo-resumen"></p>
-      <p class="total">Total <strong data-ref="total-cuenta"></strong></p>
+      <!-- Efectivo: con qué billete paga, cuánto dejar y cuánto le regresan -->
+      <div class="tarjeta-control efectivo" data-ref="bloque-efectivo" hidden>
+        <div class="control-encabezado">
+          <p class="rotulo">¿Con qué billete pagas?</p>
+          <strong class="valor-propina verde" data-ref="paga-con"></strong>
+        </div>
+        <div class="billetes" data-ref="billetes" aria-hidden="true"></div>
+        <div class="deslizador">
+          <input type="range" min="0" max="3" step="1" data-ref="billete-rango" aria-label="Billete con el que pagas">
+        </div>
+        <div class="marcas" data-lista="marcas-billete" aria-hidden="true"></div>
+        <dl class="desglose" data-ref="desglose"></dl>
+      </div>
+
+      <p class="total"><span data-ref="total-etiqueta">Total</span> <strong data-ref="total-cuenta"></strong></p>
       <p class="por-persona" data-ref="por-persona"></p>
-      <button class="boton-principal" data-accion="pagar">Pagar<span data-ref="boton-pagar"></span></button>
+      <button class="boton-principal" data-accion="pagar"><span data-ref="boton-pagar">Pagar</span></button>
       <p class="nota centrada">Prototipo escolar: el pago es una simulación.</p>
     </section>
 
     <!-- 9. Gracias: califica al mesero, la experiencia y deja reseña en Google -->
     <section class="pantalla" data-pantalla="gracias">
-      <div class="sello-ok chico" aria-hidden="true">
-        <svg viewBox="0 0 100 100"><circle class="sello-circulo" cx="50" cy="50" r="44"/><path class="sello-palomita" d="M30 52l13 13 27-28"/></svg>
+      <!-- Mensaje grande según el método de pago -->
+      <div class="aviso-pago" data-ref="aviso-pago">
+        <span class="aviso-pago-icono" data-ref="aviso-pago-icono"></span>
+        <p class="aviso-pago-titulo" data-ref="aviso-pago-titulo"></p>
+        <dl class="desglose" data-ref="aviso-pago-detalle"></dl>
       </div>
-      <h2>¡Gracias por tu visita!</h2>
-      <p data-ref="metodo-elegido"></p>
+      <h2 class="gracias-titulo">¡Gracias por tu visita!</h2>
 
       <!-- Califica al mesero y al chef: carita y, debajo, los motivos posibles de esa calificación -->
       <div class="tarjeta-control calificar" data-calificar="mesero">
