@@ -26,7 +26,7 @@ export const PLATILLOS = [
     carbohidratos: "95 g",
     carne: "120 g",
     contiene: "Gluten, lácteos",
-    ingredientes: [["🍞","Pan brioche"],["🥩","Carne de res"],["🧀","Queso cheddar"],["🥓","Tocino"],["🧅","Aros de cebolla"],["🥬","Lechuga"],["🍅","Jitomate"],["🍟","Papas"]],
+    ingredientes: [["pan","Pan brioche"],["carne","Carne de res"],["queso","Queso cheddar"],["tocino","Tocino"],["cebolla","Aros de cebolla"],["lechuga","Lechuga"],["jitomate","Jitomate"],["papas","Papas"]],
   },
   {
     id: "pasta",
@@ -43,7 +43,7 @@ export const PLATILLOS = [
     carbohidratos: "70 g",
     carne: "80 g",
     contiene: "Gluten, lácteos",
-    ingredientes: [["🍝","Spaghetti"],["🥩","Res molida"],["🍅","Salsa de jitomate"],["🧄","Ajo"],["🧀","Parmesano"],["🌿","Albahaca"]],
+    ingredientes: [["spaghetti","Spaghetti"],["carne","Res molida"],["salsa","Salsa de jitomate"],["ajo","Ajo"],["parmesano","Parmesano"],["albahaca","Albahaca"]],
   },
   {
     id: "ensalada",
@@ -60,7 +60,7 @@ export const PLATILLOS = [
     carbohidratos: "15 g",
     carne: "Sin carne",
     contiene: "Sin alérgenos comunes",
-    ingredientes: [["🥬","Lechugas"],["🍅","Jitomate cherry"],["🥒","Pepino"],["🥑","Aguacate"],["🫒","Vinagreta de oliva"]],
+    ingredientes: [["lechuga","Lechugas"],["tomate","Jitomate cherry"],["pepino","Pepino"],["aguacate","Aguacate"],["aceituna","Vinagreta de oliva"]],
   },
   {
     id: "pastel",
@@ -77,7 +77,7 @@ export const PLATILLOS = [
     carbohidratos: "55 g",
     carne: "Sin carne",
     contiene: "Gluten, lácteos, huevo",
-    ingredientes: [["🍫","Chocolate"],["🌾","Harina"],["🥚","Huevo"],["🧈","Mantequilla"],["🥛","Leche"]],
+    ingredientes: [["chocolate","Chocolate"],["harina","Harina"],["huevo-entero","Huevo"],["mantequilla","Mantequilla"],["leche","Leche"]],
   },
 ];
 
@@ -85,16 +85,48 @@ export const PLATILLOS = [
 export const PROPINA_INICIAL = 15;
 export const MAX_PERSONAS = 10;
 
-// Alergias más comunes (con su ícono). Además hay un campo para escribir otra.
+// Alergias más comunes (con su ícono de js/iconos.js). Además hay un campo para escribir otra.
 export const ALERGIAS = [
-  { id: "gluten", nombre: "Gluten", icono: "🌾" },
-  { id: "lacteos", nombre: "Lácteos", icono: "🥛" },
-  { id: "huevo", nombre: "Huevo", icono: "🥚" },
-  { id: "nueces", nombre: "Nueces", icono: "🥜" },
-  { id: "mariscos", nombre: "Mariscos", icono: "🦐" },
+  { id: "gluten", nombre: "Gluten", icono: "gluten" },
+  { id: "lacteos", nombre: "Lácteos", icono: "lacteos" },
+  { id: "huevo", nombre: "Huevo", icono: "huevo" },
+  { id: "nueces", nombre: "Nueces", icono: "nueces" },
+  { id: "mariscos", nombre: "Mariscos", icono: "mariscos" },
 ];
 
 export const MESERO = { nombre: "Carlos" };
+
+// Calificaciones con carita (1 = mal ... 5 = increíble). Debajo de la carita elegida sale su mensaje con los
+// motivos posibles; el comensal toca los que apliquen.
+export const NIVELES = ["Mal", "Regular", "Bien", "Muy bien", "¡Increíble!"];
+export const CALIFICAR = {
+  mesero: [
+    { mensaje: "Lamentamos que la atención no fuera buena. ¿Qué pasó?",
+      motivos: ["Tardó en atendernos", "Poco amable", "Se equivocó en el pedido", "No volvió a la mesa", "Tardó con la cuenta"] },
+    { mensaje: "Gracias por decirnos. ¿Qué pudo ser mejor?",
+      motivos: ["Tardó un poco", "Poco atento", "No conocía el menú", "No explicó los platillos"] },
+    { mensaje: "¡Gracias! ¿Qué le faltó para ser excelente?",
+      motivos: ["Más atención", "Más rapidez", "Recomendaciones", "Más simpatía"] },
+    { mensaje: "¡Qué bueno! ¿Qué te gustó de su atención?",
+      motivos: ["Amable", "Rápido", "Atento", "Buenas recomendaciones"] },
+    { mensaje: "¡Le daremos tus felicitaciones! ¿Qué te encantó?",
+      motivos: ["Súper amable", "Muy rápido", "Atento sin agobiar", "Gran recomendación", "Nos hizo sentir en casa"] },
+  ],
+  chef: [
+    { mensaje: "Lo sentimos mucho. ¿Qué no estuvo bien?",
+      motivos: ["Le faltó sabor", "Llegó frío", "Mal cocido", "No era lo que pedí", "Tardó demasiado"] },
+    { mensaje: "Gracias por decirnos. ¿Qué podemos mejorar?",
+      motivos: ["Le faltó sazón", "Llegó tibio", "Porción chica", "Presentación descuidada"] },
+    { mensaje: "¡Gracias! ¿Qué le faltó para ser excelente?",
+      motivos: ["Más sabor", "Más caliente", "Mejor presentación", "Más rápido"] },
+    { mensaje: "¡Qué gusto! ¿Qué te gustó?",
+      motivos: ["Buen sabor", "Bien servido", "Temperatura perfecta", "Llegó rápido"] },
+    { mensaje: "¡Se lo diremos al chef! ¿Qué te encantó?",
+      motivos: ["Delicioso", "Presentación hermosa", "En su punto", "Porción generosa", "Volvería por él"] },
+  ],
+};
+// Lo que se califica del chef, cada aspecto con estrellas.
+export const ASPECTOS_CHEF = ["Sabor", "Presentación", "Temperatura", "Tiempo"];
 
 // Reseña en Google. Cambiar por el enlace "Pedir reseñas" del perfil de Google Business del restaurante real
 // (tiene la forma https://search.google.com/local/writereview?placeid=...).

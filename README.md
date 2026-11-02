@@ -2,7 +2,7 @@
 
 Menú web del restaurante. El comensal acerca el celular a la tarjeta NFC de la mesa y se abre esta página en el navegador, sin instalar ninguna app:
 
-1. **Intro**: "Toca para entrar" y el logo reveal de Chefi con sonido (`media/intro_chefi.mp4`, hecho en Remotion: composición `ChefiIntroWeb` en `~/AGENTE MOTION GRAPHICS`).
+1. **Intro**: logo reveal de Chefi dibujado en vivo en SVG (`js/intro.js`), con los tiempos de `ChaosLogo` del video en Remotion. Arranca solo; el primer toque activa el sonido y la vibración.
 2. **Bienvenida**: las acciones de la experiencia y "Así funciona" en 5 pasos animados. Un solo botón: **Empezar**.
 3. **¿Solo o con amigos?**: se agregan los nombres y se decide antes de pedir cómo se divide la cuenta (partes iguales o cada quien lo suyo).
 4. **Menú y platillo en 3D**: se gira; si se sacude, se cae y la pantalla se llena de ingredientes. **Ver en mi mesa** lo pone a tamaño real con la cámara, con su información nutricional (iPhone: banner de AR Quick Look con botón "Agregar al pedido"; Android: etiqueta flotante en WebXR).
@@ -34,8 +34,9 @@ Abre http://localhost:8000/?mesa=4 en el navegador. En la computadora el 3D se p
 | `js/caida.js` | "Se cayó el platillo": lluvia de ingredientes | Eddy / Claude |
 | `js/sonido.js` | Efectos de sonido y vibración | Eddy / Claude |
 | `js/intro.js` | Intro con el logo reveal | Eddy / Claude |
+| `js/iconos.js` | Íconos SVG (la interfaz nunca usa emojis) | Eddy / Claude |
 | `js/fondo.js` | Fondo con profundidad (paralaje) | Eddy / Claude |
-| `media/` | Video del intro y efectos de sonido | No tocar |
+| `media/` | Efectos de sonido | No tocar |
 | `modelos/` | Modelos 3D a escala real (plato de 27 cm): `.glb` para web/Android y `.usdz` para iPhone | No tocar |
 
 ## Regla para el diseño: los atributos `data-*`

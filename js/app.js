@@ -1,10 +1,11 @@
 // Lógica del menú digital: navegación, grupo, pedido, estado del pedido, cuenta, pago y encuestas.
 // No depende del diseño: busca los elementos por sus atributos data-* (ver README.md).
 
-import { CATEGORIAS, PLATILLOS, PROPINA_INICIAL, MAX_PERSONAS, ALERGIAS, MESERO, RESENA_GOOGLE } from "./datos.js";
+import { CATEGORIAS, PLATILLOS, PROPINA_INICIAL, MAX_PERSONAS, ALERGIAS, MESERO, RESENA_GOOGLE, NIVELES, CALIFICAR, ASPECTOS_CHEF } from "./datos.js";
 import { montarVisor, verEnMiMesa, reiniciarVisor } from "./ar.js";
 import { vigilarSacudida, lluviaDeIngredientes } from "./caida.js";
-import { desbloquearAudio, sonar, vibrar, sentir } from "./sonido.js";
+import { prepararAudio, desbloquearAudio, sonar, vibrar, sentir, sonidoEstrella, sonidoCarita, sonidoToque } from "./sonido.js";
+import { icono, carita } from "./iconos.js";
 import { iniciarIntro } from "./intro.js";
 import { iniciarFondo, pedirMovimiento } from "./fondo.js";
 
@@ -14,10 +15,10 @@ const FRASES = ["El menú se digitaliza.", "Acerca tu celular.", "Elige tu plati
 const ETAPAS = [
   { a: 0, titulo: "¡Pedido recibido!", texto: "Cocina ya tiene tu pedido." },
   { a: 5000, titulo: "Preparando tus alimentos", texto: "El chef ya está cocinando." },
-  { a: 10000, titulo: "¡Ya está en tu mesa!", texto: "Buen provecho 🍽️" },
+  { a: 10000, titulo: "¡Ya está en tu mesa!", texto: "Buen provecho." },
 ];
-const CARITAS = [["😣", "Mal"], ["😕", "Regular"], ["🙂", "Bien"], ["😄", "Muy bien"], ["🤩", "¡Increíble!"]];
-const ETIQUETAS_MESERO = ["Amable", "Rápido", "Atento", "Buenas recomendaciones", "Simpático"];
+const CADA_FRASE = 3800; // ms que dura cada frase del héroe
+const LEYENDA_ESTRELLAS = ["", "Malo", "Regular", "Bueno", "Muy bueno", "Excelente"];
 const COLORES_PERSONA = ["#F26B1D", "#2E9E6A", "#F6C445", "#1F1F1F", "#E0533A", "#4A90C2"];
 const METODOS = { tarjeta: "Tarjeta (terminal en la mesa)", "en-linea": "Pago en línea", efectivo: "Efectivo" };
 
@@ -38,8 +39,7 @@ const estado = {
   personasIguales: 1,
   quienPaga: 0, // en "lo que consumí": índice de la persona que paga ahora (-1 = toda la mesa)
   metodo: "tarjeta",
-  mesero: null,
-  meseroTags: [],
+  calif: { mesero: null, chef: null, motivos: { mesero: [], chef: [] }, aspectos: {} },
   encuesta: null,
   encuestaMenu: null,
   google: null,
@@ -89,9 +89,10 @@ function cargar() {
 }
 
 let temporizadorAviso;
-function avisar(mensaje) {
+function avisar(mensaje, dibujo = "check") {
   const aviso = ref("aviso");
-  aviso.textContent = mensaje;
+  aviso.innerHTML = `<span class="aviso-icono aviso-${dibujo}">${icono(dibujo)}</span>`;
+  aviso.append(mensaje);
   aviso.hidden = false;
   reanimar(aviso, "entrando");
   aviso.classList.remove("saliendo");
@@ -133,21 +134,51 @@ function mostrar() {
 
 let fraseTimer;
 let observador;
+// Cada frase entra palabra por palabra desde una máscara (con un subrayado que se dibuja) y la anterior
+// sale hacia arriba desenfocándose.
+function ponerFrase(titulo, texto) {
+  const vieja = titulo.querySelector(".heroe-frase:not(.sale)");
+  if (vieja) {
+    vieja.classList.add("sale");
+    vieja.removeAttribute("data-ref");
+    setTimeout(() => vieja.remove(), 700);
+  }
+  const frase = document.createElement("span");
+  frase.className = "heroe-frase";
+  frase.dataset.ref = "frase-heroe";
+  const palabras = texto.split(" ");
+  palabras.forEach((p, i) => {
+    const caja = document.createElement("span");
+    caja.className = "palabra";
+    const interior = document.createElement("span");
+    interior.textContent = p;
+    interior.style.setProperty("--i", i);
+    caja.append(interior);
+    frase.append(caja, i < palabras.length - 1 ? " " : "");
+  });
+  frase.style.setProperty("--n", palabras.length);
+  titulo.append(frase);
+}
+
 function pintarBienvenida() {
   texto("saludo", estado.mesa ? `Bienvenido a la mesa ${estado.mesa}` : "Bienvenido");
   let i = 0;
-  const frase = ref("frase-heroe");
+  const titulo = document.querySelector(".heroe-titulo");
+  titulo.replaceChildren();
   const puntos = lista("puntos-heroe");
   puntos.replaceChildren(...FRASES.map(() => document.createElement("i")));
+  puntos.style.setProperty("--dura", `${CADA_FRASE}ms`);
   const poner = () => {
-    frase.textContent = FRASES[i];
-    reanimar(frase, "cambia");
-    [...puntos.children].forEach((p, k) => p.classList.toggle("activo", k === i));
+    ponerFrase(titulo, FRASES[i]);
+    [...puntos.children].forEach((p, k) => {
+      p.classList.toggle("activo", k === i);
+      p.classList.toggle("visto", k < i);
+    });
     i = (i + 1) % FRASES.length;
   };
   clearInterval(fraseTimer);
   poner();
-  fraseTimer = setInterval(() => (vistaActual() === "bienvenida" ? poner() : clearInterval(fraseTimer)), 2300);
+  fraseTimer = setInterval(() => (vistaActual() === "bienvenida" ? poner() : clearInterval(fraseTimer)), CADA_FRASE);
 
   // Los pasos se animan cuando aparecen en pantalla.
   const pasos = document.querySelectorAll(".paso");
@@ -228,7 +259,7 @@ function pintarDetalle(id) {
   texto("nombre", p.nombre, raiz);
   texto("precio", dinero.format(p.precio), raiz);
   texto("descripcion", p.descripcion, raiz);
-  texto("contiene", p.contiene ? `⚠️ Contiene: ${p.contiene}` : "", raiz);
+  ref("contiene", raiz).innerHTML = p.contiene ? `${icono("alerta")}<span>Contiene: ${p.contiene}</span>` : "";
   texto("porcion", p.porcion, raiz);
   texto("kcal", `${p.kcal} kcal`, raiz);
   texto("carbohidratos", p.carbohidratos, raiz);
@@ -249,7 +280,8 @@ function pintarAlergias() {
   lista("alergias").replaceChildren(...ALERGIAS.map((a) => {
     const boton = copiar("alergia");
     const activa = estado.alergias.includes(a.id);
-    boton.querySelector(".alergia-icono").textContent = a.icono;
+    boton.querySelector(".alergia-icono").innerHTML = icono(a.icono);
+    pintarIconos(boton);
     boton.querySelector(".alergia-nombre").textContent = a.nombre;
     boton.dataset.valor = a.id;
     boton.classList.toggle("activo", activa);
@@ -287,7 +319,7 @@ function agregar({ desdeRA = false } = {}) {
   const p = platillo(estado.actual);
   sentir("success", [30, 40, 70], 0.7);
   if (!desdeRA) volarAlPedido(p.foto);
-  avisar(`✓ ${p.nombre} se agregó a tu pedido`);
+  avisar(`${p.nombre} se agregó a tu pedido`);
   guardar();
 }
 
@@ -331,9 +363,10 @@ function tirarPlatillo() {
   sentir("plate", [200, 60, 120], 0.8);
   document.querySelector(".visor-3d")?.classList.add("cayendo");
   texto("caida-nombre", p.nombre);
-  lista("ingredientes").replaceChildren(...p.ingredientes.map(([emoji, nombre]) => {
+  lista("ingredientes").replaceChildren(...p.ingredientes.map(([dibujo, nombre]) => {
     const chip = copiar("ingrediente");
-    chip.textContent = `${emoji} ${nombre}`;
+    chip.innerHTML = icono(dibujo);
+    chip.append(nombre);
     return chip;
   }));
   caida.hidden = false;
@@ -393,11 +426,8 @@ function pintarEstado(animar = false) {
   const etapa = etapaActual();
   texto("estado-titulo", ETAPAS[etapa].titulo);
   texto("estado-texto", ETAPAS[etapa].texto);
-  ref("progreso").querySelectorAll("li").forEach((li) => {
-    const n = Number(li.dataset.etapa);
-    li.classList.toggle("hecho", n === 0 || n < etapa || etapa === 2);
-    li.classList.toggle("actual", n === 1 && etapa === 1);
-  });
+  pintarProgreso(etapa);
+  if (estado.pedidoEn) texto("hora-0", new Date(estado.pedidoEn).toLocaleTimeString("es-MX", { hour: "numeric", minute: "2-digit" }));
   ref("cocina").hidden = etapa !== 1;
   const sello = ref("sello-ok");
   sello.classList.toggle("en-mesa", etapa === 2);
@@ -405,9 +435,27 @@ function pintarEstado(animar = false) {
   if (animar) reanimar(sello, "sella");
 }
 
+// Línea del tiempo: lo hecho en verde, lo que está pasando en amarillo y lo que sigue en espera (punteado).
+// El tramo hacia la siguiente etapa se va llenando con el tiempo real del pedido.
+function pintarProgreso(etapa = etapaActual()) {
+  const t = estado.pedidoEn ? Date.now() - estado.pedidoEn : 0;
+  ref("progreso").querySelectorAll("li").forEach((li) => {
+    const n = Number(li.dataset.etapa);
+    const enCurso = n === etapa && n === 1;
+    li.classList.toggle("hecho", n <= etapa && !enCurso);
+    li.classList.toggle("actual", enCurso);
+    li.classList.toggle("espera", n > etapa);
+    li.classList.toggle("siguiente", n === etapa + 1);
+    const desde = ETAPAS[n - 1]?.a ?? 0;
+    const avance = n <= etapa ? 1 : n === etapa + 1 ? Math.min(1, (t - desde) / (ETAPAS[n].a - desde)) : 0;
+    li.style.setProperty("--avance", avance.toFixed(3));
+  });
+}
+
 // Revisa cada medio segundo si el pedido cambió de etapa; vibra y suena en cada una.
 function revisarEtapa() {
   if (!estado.pedidoEn) return;
+  if (vistaActual() === "estado") pintarProgreso();
   const etapa = etapaActual();
   if (etapa <= estado.etapaVista) return;
   estado.etapaVista = etapa;
@@ -415,7 +463,7 @@ function revisarEtapa() {
   if (etapa === 1) sentir("shimmer", [60, 40, 60], 0.6);
   if (etapa === 2) sentir("bell", [220, 90, 220, 90, 320], 0.9);
   if (vistaActual() === "estado") pintarEstado(true);
-  else if (etapa > 0) avisar(etapa === 2 ? "🔔 ¡Tu pedido ya está en tu mesa!" : "🍳 Están preparando tus alimentos");
+  else if (etapa > 0) avisar(etapa === 2 ? "¡Tu pedido ya está en tu mesa!" : "Están preparando tus alimentos", etapa === 2 ? "en-mesa" : "preparando");
 }
 
 // ---------- 7–8. Pago y cuenta ----------
@@ -507,7 +555,9 @@ function pintarDivision() {
   });
   const todos = copiar("reparto");
   todos.dataset.valor = -1;
-  todos.querySelector(".persona-avatar").textContent = "★";
+  const avatarTodos = todos.querySelector(".persona-avatar");
+  avatarTodos.innerHTML = icono("grupo");
+  avatarTodos.style.background = "var(--carbon)";
   todos.querySelector(".reparto-nombre").textContent = "Toda la mesa";
   todos.querySelector(".reparto-detalle").textContent = "una sola persona paga";
   todos.querySelector(".reparto-monto").textContent = dinero.format(total);
@@ -528,52 +578,113 @@ function pintarGracias() {
                      "en-linea": "Tu pago en línea quedó registrado." };
   texto("metodo-elegido", mensajes[estado.metodo] || "");
   texto("mesero-nombre", MESERO.nombre);
-  pintarCaritas();
+  pintarCalificacion("mesero");
+  pintarCalificacion("chef");
+  pintarAspectos();
   pintarEstrellas(lista("encuesta"), estado.encuesta);
   pintarEstrellas(lista("encuesta-menu"), estado.encuestaMenu);
   pintarEstrellas(lista("estrellas-google"), estado.google);
-  ref("encuesta-gracias").hidden = !(estado.encuesta && estado.encuestaMenu && estado.mesero != null);
+  pintarGraciasEncuesta();
 }
 
-function pintarCaritas() {
-  lista("caritas").replaceChildren(...CARITAS.map(([cara, etiqueta], i) => {
-    const b = document.createElement("button");
-    b.className = "carita";
-    b.dataset.accion = "carita";
-    b.dataset.valor = i;
-    b.textContent = cara;
-    b.setAttribute("aria-label", etiqueta);
-    b.classList.toggle("activo", estado.mesero === i);
-    b.classList.toggle("apagada", estado.mesero != null && estado.mesero !== i);
-    return b;
-  }));
-  texto("mesero-etiqueta", estado.mesero != null ? CARITAS[estado.mesero][1] : "Toca una carita");
-  const tags = lista("mesero-tags");
-  tags.hidden = estado.mesero == null;
-  tags.replaceChildren(...ETIQUETAS_MESERO.map((t) => {
+function pintarGraciasEncuesta() {
+  const { mesero, chef } = estado.calif;
+  ref("encuesta-gracias").hidden = !(estado.encuesta && estado.encuestaMenu && mesero != null && chef != null);
+}
+
+// Caritas (mesero o chef) y, debajo, el mensaje con los motivos posibles de la carita elegida.
+function pintarCalificacion(quien) {
+  const elegida = estado.calif[quien];
+  const caritas = lista(`caritas-${quien}`);
+  if (caritas.children.length !== NIVELES.length) {
+    caritas.replaceChildren(...NIVELES.map((nombre, i) => {
+      const b = document.createElement("button");
+      b.className = "carita";
+      b.dataset.accion = "carita";
+      b.dataset.quien = quien;
+      b.dataset.valor = i;
+      b.style.setProperty("--i", i);
+      b.innerHTML = `${carita(i + 1)}<span class="carita-nombre">${nombre}</span>`;
+      b.setAttribute("aria-label", nombre);
+      return b;
+    }));
+  }
+  [...caritas.children].forEach((b, i) => {
+    b.classList.toggle("activo", elegida === i);
+    b.classList.toggle("apagada", elegida != null && elegida !== i);
+    b.setAttribute("aria-pressed", elegida === i);
+  });
+  const caja = ref(`motivos-${quien}`);
+  caja.hidden = elegida == null;
+  if (elegida == null) return;
+  const { mensaje, motivos } = CALIFICAR[quien][elegida];
+  caja.dataset.nivel = elegida + 1;
+  texto(`mensaje-${quien}`, mensaje);
+  lista(`motivos-${quien}`).replaceChildren(...motivos.map((m, i) => {
     const chip = copiar("opcion");
-    chip.dataset.accion = "tag-mesero";
-    chip.dataset.valor = t;
-    chip.textContent = t;
-    chip.classList.toggle("activo", estado.meseroTags.includes(t));
+    chip.dataset.accion = "motivo";
+    chip.dataset.quien = quien;
+    chip.dataset.valor = m;
+    chip.textContent = m;
+    chip.style.setProperty("--i", i);
+    chip.classList.add("chip-motivo");
+    chip.classList.toggle("activo", estado.calif.motivos[quien].includes(m));
     return chip;
   }));
 }
 
-const ESTRELLA = '<svg viewBox="0 0 24 24"><path d="M12 2.6l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 17.4l-5.8 3.1 1.1-6.5L2.6 9.4l6.5-.9z"/></svg>';
+function pintarAspectos() {
+  const contenedor = lista("aspectos-chef");
+  if (!contenedor.children.length) {
+    contenedor.replaceChildren(...ASPECTOS_CHEF.map((nombre) => {
+      const fila = document.createElement("div");
+      fila.className = "aspecto";
+      fila.innerHTML = `<span>${nombre}</span><div class="estrellas chicas" data-lista="aspecto" data-aspecto="${nombre}"></div>`;
+      return fila;
+    }));
+  }
+  contenedor.querySelectorAll('[data-lista="aspecto"]').forEach((c) => pintarEstrellas(c, estado.calif.aspectos[c.dataset.aspecto]));
+}
+
+// Estrellas: se arman una sola vez y luego solo cambian de estado, para que la animación sea continua.
+// Al elegir, el relleno florece desde el centro de cada estrella, en cadena hasta la elegida, y la elegida brilla.
+const ESTRELLA = "M12 2.9c.4 0 .7.2.9.6l2.3 4.7 5.2.8c.8.1 1.1 1.1.5 1.7l-3.8 3.7.9 5.2c.1.8-.7 1.4-1.4 1L12 18.2l-4.6 2.4c-.7.4-1.5-.2-1.4-1l.9-5.2-3.8-3.7c-.6-.6-.3-1.6.5-1.7l5.2-.8 2.3-4.7c.2-.4.5-.6.9-.6z";
 function pintarEstrellas(contenedor, valor, animar = false) {
-  contenedor.replaceChildren(...[1, 2, 3, 4, 5].map((v, i) => {
-    const b = document.createElement("button");
-    b.className = "estrella";
-    b.dataset.accion = "estrella";
-    b.dataset.valor = v;
-    b.setAttribute("aria-label", `${v} de 5`);
-    b.innerHTML = `<span class="estrella-vacia">${ESTRELLA}</span><span class="estrella-llena">${ESTRELLA}</span>`;
-    b.style.setProperty("--i", i);
+  const google = contenedor.classList.contains("google-estrellas");
+  if (contenedor.querySelectorAll(".estrella").length !== 5) {
+    const botones = [1, 2, 3, 4, 5].map((v, i) => {
+      const b = document.createElement("button");
+      b.className = "estrella";
+      b.dataset.accion = "estrella";
+      b.dataset.valor = v;
+      b.setAttribute("aria-label", `${v} de 5`);
+      b.style.setProperty("--i", i);
+      b.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">
+        <path class="estrella-fondo" d="${ESTRELLA}"/>
+        <path class="estrella-relleno" d="${ESTRELLA}" fill="url(#${google ? "estrella-google" : "estrella-chefi"})"/>
+        <path class="estrella-brillo" d="M8.6 7.6l1.2-2.3"/>
+        <g class="estrella-chispa"><path d="M20.6 1.4l.6 1.5 1.5.6-1.5.6-.6 1.5-.6-1.5-1.5-.6 1.5-.6z"/></g>
+      </svg><span class="estrella-halo"></span>`;
+      return b;
+    });
+    const leyenda = document.createElement("span");
+    leyenda.className = "estrellas-leyenda";
+    contenedor.replaceChildren(...botones, leyenda);
+  }
+  const antes = Number(contenedor.dataset.valor || 0);
+  contenedor.dataset.valor = valor ?? 0;
+  contenedor.querySelectorAll(".estrella").forEach((b, i) => {
+    const v = i + 1;
+    // Las que se llenan van en cadena desde la última que ya estaba llena; las que se vacían, al revés y rápido.
+    const retraso = v > antes ? (v - antes - 1) * 55 : (antes - v) * 25;
+    b.style.setProperty("--retraso", `${animar ? retraso : 0}ms`);
     b.classList.toggle("activo", valor != null && v <= valor);
-    return b;
-  }));
-  if (animar) reanimar(contenedor, "ola");
+    b.classList.toggle("elegida", animar && v === valor);
+    b.setAttribute("aria-pressed", valor != null && v <= valor);
+  });
+  const leyenda = contenedor.querySelector(".estrellas-leyenda");
+  leyenda.textContent = LEYENDA_ESTRELLAS[valor ?? 0];
+  if (animar) reanimar(leyenda, "cambia");
 }
 
 function pintarBarra() {
@@ -664,35 +775,42 @@ const acciones = {
     sentir("pay2", [60, 40, 140], 0.8);
     estado.enviados = [];
     estado.pedidoEn = null;
-    estado.mesero = null;
-    estado.meseroTags = [];
+    estado.calif = { mesero: null, chef: null, motivos: { mesero: [], chef: [] }, aspectos: {} };
     estado.encuesta = null;
     estado.encuestaMenu = null;
     estado.google = null;
     ir("gracias");
   },
   carita: (el) => {
-    estado.mesero = Number(el.dataset.valor);
-    sentir(estado.mesero >= 3 ? "success" : "pop3", estado.mesero >= 3 ? [30, 40, 60] : 20, 0.6);
-    pintarCaritas();
-    const activa = lista("caritas").querySelector(".activo");
-    activa && reanimar(activa, "festeja");
-    pintarGracias();
+    const quien = el.dataset.quien;
+    const nivel = Number(el.dataset.valor);
+    if (estado.calif[quien] !== nivel) estado.calif.motivos[quien] = [];
+    estado.calif[quien] = nivel;
+    sonidoCarita(nivel + 1);
+    vibrar(nivel >= 3 ? [12, 40, 18] : 14);
+    pintarCalificacion(quien);
+    reanimar(el, "festeja");
+    reanimar(ref(`motivos-${quien}`), "aparece");
+    pintarGraciasEncuesta();
   },
-  "tag-mesero": (el) => {
-    const t = el.dataset.valor;
-    estado.meseroTags = estado.meseroTags.includes(t) ? estado.meseroTags.filter((x) => x !== t) : [...estado.meseroTags, t];
-    sentir("pop3", 10, 0.4);
-    pintarCaritas();
+  motivo: (el) => {
+    const { quien, valor } = el.dataset;
+    const motivos = estado.calif.motivos[quien];
+    estado.calif.motivos[quien] = motivos.includes(valor) ? motivos.filter((m) => m !== valor) : [...motivos, valor];
+    sonidoToque();
+    vibrar(6);
+    el.classList.toggle("activo", estado.calif.motivos[quien].includes(valor));
+    reanimar(el, "rebote");
   },
   estrella: (el) => {
     const contenedor = el.closest("[data-lista]");
     const v = Number(el.dataset.valor);
-    const clave = { encuesta: "encuesta", "encuesta-menu": "encuestaMenu", "estrellas-google": "google" }[contenedor.dataset.lista];
-    estado[clave] = v;
-    sentir("stars", [15, 30, 15, 30, 40].slice(0, v * 2 - 1), 0.6);
+    if (contenedor.dataset.lista === "aspecto") estado.calif.aspectos[contenedor.dataset.aspecto] = v;
+    else estado[{ encuesta: "encuesta", "encuesta-menu": "encuestaMenu", "estrellas-google": "google" }[contenedor.dataset.lista]] = v;
+    sonidoEstrella(v);
+    vibrar(8);
     pintarEstrellas(contenedor, v, true);
-    ref("encuesta-gracias").hidden = !(estado.encuesta && estado.encuestaMenu && estado.mesero != null);
+    pintarGraciasEncuesta();
   },
   "publicar-google": () => {
     const resena = ref("texto-google").value.trim();
@@ -756,11 +874,21 @@ ref("aviso").addEventListener("animationend", (evento) => {
 
 // ---------- Inicio ----------
 
+// Pone el dibujo SVG en cada elemento con data-icono="nombre" (ver js/iconos.js).
+function pintarIconos(raiz = document) {
+  raiz.querySelectorAll("[data-icono]").forEach((el) => {
+    if (!el.firstElementChild) el.innerHTML = icono(el.dataset.icono);
+  });
+}
+
 cargar();
+// Un estado guardado por la versión anterior no tiene calificaciones del chef.
+estado.calif ??= { mesero: null, chef: null, motivos: { mesero: [], chef: [] }, aspectos: {} };
+prepararAudio();
+pintarIconos();
 texto("mesa", estado.mesa ? `Mesa ${estado.mesa}` : "");
-texto("intro-mesa", estado.mesa ? `Mesa ${estado.mesa}` : "Bienvenido");
 iniciarFondo();
 window.addEventListener("hashchange", mostrar);
 setInterval(revisarEtapa, 500);
-iniciarIntro({ mostrar: () => document.body.classList.add("listo") });
+iniciarIntro({ mostrar: () => document.body.classList.add("listo"), mesa: estado.mesa ? `Mesa ${estado.mesa}` : "Bienvenido" });
 mostrar();

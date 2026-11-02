@@ -11,7 +11,6 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;900&family=Inter+Tight:wght@400;500;600;700;800&display=swap">
   <link rel="icon" href="img/icono.svg" type="image/svg+xml">
   <link rel="stylesheet" href="css/estilos.css">
-  <link rel="preload" href="media/intro_chefi.mp4" as="video" type="video/mp4">
   <script type="module" src="https://cdn.jsdelivr.net/npm/@google/model-viewer@3.5.0/dist/model-viewer.min.js"></script>
   <script type="module" src="js/app.js"></script>
 </head>
@@ -28,17 +27,19 @@
     <div class="particulas"></div>
   </div>
 
-  <!-- Intro: toca para entrar → logo reveal con sonido -->
+  <!-- Intro: logo reveal de Chefi dibujado en vivo (js/intro.js). Arranca solo; el primer toque activa sonido y vibración -->
   <div class="intro" data-ref="intro">
-    <video src="media/intro_chefi.mp4" playsinline preload="auto" muted></video>
-    <button class="intro-tocar" data-accion-intro="entrar">
-      <span class="intro-ondas" aria-hidden="true"><i></i><i></i><i></i><b></b></span>
-      <span class="intro-mesa" data-ref="intro-mesa">Bienvenido</span>
-      <strong>Toca para entrar</strong>
-      <small>🔊 Sube el volumen</small>
-    </button>
+    <button class="intro-sonido" data-accion-intro="sonido"><span>Toca para activar el sonido</span></button>
     <button class="intro-saltar" data-accion-intro="saltar">Saltar</button>
   </div>
+
+  <!-- Degradados compartidos por las estrellas -->
+  <svg class="defs" aria-hidden="true" width="0" height="0">
+    <defs>
+      <linearGradient id="estrella-chefi" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F8D46A"/><stop offset="1" stop-color="#F2A13A"/></linearGradient>
+      <linearGradient id="estrella-google" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FCC934"/><stop offset="1" stop-color="#FBBC04"/></linearGradient>
+    </defs>
+  </svg>
 
   <header class="barra-superior">
     <button class="boton-icono" data-accion="atras" aria-label="Regresar">‹</button>
@@ -137,11 +138,11 @@
       <h2>¿Vienes solo o con amigos?</h2>
       <div class="elegir-grupo">
         <button class="opcion-grande" data-accion="grupo-solo">
-          <span class="opcion-icono" aria-hidden="true">🙋</span>
+          <span class="opcion-icono" data-icono="solo"></span>
           <span><strong>Vengo solo</strong><small>Una sola cuenta</small></span>
         </button>
         <button class="opcion-grande" data-accion="grupo-amigos" data-ref="opcion-amigos">
-          <span class="opcion-icono" aria-hidden="true">👯</span>
+          <span class="opcion-icono" data-icono="amigos"></span>
           <span><strong>Vengo con amigos</strong><small>Dividimos la cuenta</small></span>
         </button>
       </div>
@@ -181,7 +182,7 @@
     <section class="pantalla" data-pantalla="detalle">
       <div class="escenario">
         <div class="contenedor-visor" data-ref="visor"></div>
-        <span class="pista-giro">Gíralo · sacúdelo y se cae 😉</span>
+        <span class="pista-giro"><span data-icono="girar"></span>Gíralo · sacúdelo y se cae</span>
       </div>
 
       <!-- Función extra: abre la cámara y pone el platillo a escala real sobre la mesa -->
@@ -233,7 +234,7 @@
       <h2>Tu pedido</h2>
       <div data-lista="pedido"></div>
       <div class="vacio" data-ref="pedido-vacio">
-        <span aria-hidden="true">🍽️</span>
+        <span data-icono="plato"></span>
         <p>Aún no agregas platillos.</p>
         <button class="boton-secundario" data-accion="ir" data-destino="menu">Ir al menú</button>
       </div>
@@ -251,9 +252,9 @@
       <h2 data-ref="estado-titulo">¡Pedido recibido!</h2>
       <p data-ref="estado-texto">Cocina ya tiene tu pedido.</p>
       <ol class="progreso" data-ref="progreso" aria-label="Estado del pedido">
-        <li data-etapa="0"><span class="etapa-icono">✓</span>Recibido</li>
-        <li data-etapa="1"><span class="etapa-icono">🍳</span>Preparando</li>
-        <li data-etapa="2"><span class="etapa-icono">🔔</span>En tu mesa</li>
+        <li data-etapa="0"><span class="etapa-icono"><span data-icono="recibido"></span><span class="etapa-ok" data-icono="check"></span></span><strong>Recibido</strong><small data-ref="hora-0">Ahora</small></li>
+        <li data-etapa="1"><span class="etapa-via"><i></i></span><span class="etapa-icono"><span data-icono="preparando"></span><span class="etapa-ok" data-icono="check"></span></span><strong>Preparando</strong><small>≈ 5 min</small></li>
+        <li data-etapa="2"><span class="etapa-via"><i></i></span><span class="etapa-icono"><span data-icono="en-mesa"></span><span class="etapa-ok" data-icono="check"></span></span><strong>En tu mesa</strong><small>≈ 10 min</small></li>
       </ol>
       <div class="cocina" data-ref="cocina" aria-hidden="true">
         <span class="sarten"></span><span class="vapor"><i></i><i></i><i></i></span>
@@ -269,9 +270,9 @@
       <h2>¿Cómo quieres pagar?</h2>
       <p class="a-pagar">Consumo de la mesa <strong data-ref="a-pagar"></strong></p>
       <div class="metodos">
-        <label><input type="radio" name="metodo" value="tarjeta" checked><span class="metodo-icono" aria-hidden="true">💳</span><span>Tarjeta<small>Te llevamos la terminal</small></span></label>
-        <label><input type="radio" name="metodo" value="en-linea"><span class="metodo-icono" aria-hidden="true">📱</span><span>Pago en línea<small>Desde este celular</small></span></label>
-        <label><input type="radio" name="metodo" value="efectivo"><span class="metodo-icono" aria-hidden="true">💵</span><span>Efectivo<small>Un mesero pasa a cobrar</small></span></label>
+        <label><input type="radio" name="metodo" value="tarjeta" checked><span class="metodo-icono" data-icono="tarjeta"></span><span>Tarjeta<small>Te llevamos la terminal</small></span></label>
+        <label><input type="radio" name="metodo" value="en-linea"><span class="metodo-icono" data-icono="en-linea"></span><span>Pago en línea<small>Desde este celular</small></span></label>
+        <label><input type="radio" name="metodo" value="efectivo"><span class="metodo-icono" data-icono="efectivo"></span><span>Efectivo<small>Un mesero pasa a cobrar</small></span></label>
       </div>
       <button class="boton-principal" data-accion="elegir-metodo">Continuar</button>
     </section>
@@ -340,13 +341,30 @@
       <h2>¡Gracias por tu visita!</h2>
       <p data-ref="metodo-elegido"></p>
 
-      <div class="tarjeta-control mesero">
-        <div class="mesero-cabeza">
-          <span class="mesero-foto" aria-hidden="true">🧑‍🍳</span>
-          <div><p class="rotulo">¿Cómo te atendió <span data-ref="mesero-nombre"></span>?</p><small data-ref="mesero-etiqueta">Toca una carita</small></div>
+      <!-- Califica al mesero y al chef: carita y, debajo, los motivos posibles de esa calificación -->
+      <div class="tarjeta-control calificar" data-calificar="mesero">
+        <div class="calificar-cabeza">
+          <span class="calificar-foto" data-icono="mesero"></span>
+          <div><p class="calificar-titulo">Califica al mesero</p><p class="rotulo">¿Cómo te atendió <span data-ref="mesero-nombre"></span>?</p></div>
         </div>
-        <div class="caritas" data-lista="caritas"></div>
-        <div class="opciones envolver" data-lista="mesero-tags" hidden></div>
+        <div class="caritas" data-lista="caritas-mesero"></div>
+        <div class="motivos" data-ref="motivos-mesero" hidden>
+          <p class="motivos-mensaje" data-ref="mensaje-mesero"></p>
+          <div class="opciones envolver" data-lista="motivos-mesero"></div>
+        </div>
+      </div>
+
+      <div class="tarjeta-control calificar" data-calificar="chef">
+        <div class="calificar-cabeza">
+          <span class="calificar-foto" data-icono="chef"></span>
+          <div><p class="calificar-titulo">Califica al chef</p><p class="rotulo">¿Qué tal estuvo tu comida?</p></div>
+        </div>
+        <div class="caritas" data-lista="caritas-chef"></div>
+        <div class="motivos" data-ref="motivos-chef" hidden>
+          <p class="motivos-mensaje" data-ref="mensaje-chef"></p>
+          <div class="opciones envolver" data-lista="motivos-chef"></div>
+        </div>
+        <div class="aspectos" data-lista="aspectos-chef"></div>
       </div>
 
       <div class="tarjeta-control">
@@ -427,7 +445,7 @@
   </template>
 
   <template data-plantilla="alergia">
-    <button class="alergia" data-accion="alergia" aria-pressed="false"><span class="alergia-icono"></span><span class="alergia-nombre"></span></button>
+    <button class="alergia" data-accion="alergia" aria-pressed="false"><span class="alergia-icono"></span><span class="alergia-nombre"></span><span class="alergia-check" data-icono="check"></span></button>
   </template>
 
   <template data-plantilla="persona">

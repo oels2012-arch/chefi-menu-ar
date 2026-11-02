@@ -1,5 +1,7 @@
 // "Se cayó el platillo": si el comensal gira el 3D con mucha fuerza (o sacude el celular),
-// el platillo se cae y la pantalla se llena con sus ingredientes.
+// el platillo se cae y la pantalla se llena con sus ingredientes (dibujados en SVG, ver js/iconos.js).
+
+import { imagenesDeIconos } from "./iconos.js";
 
 const VUELTAS_PARA_CAER = 1.6; // vueltas acumuladas en menos de un segundo
 const VENTANA_MS = 1000;
@@ -48,7 +50,7 @@ function normalizar(angulo) {
 }
 
 // Lluvia de ingredientes que se apilan desde abajo hasta llenar la pantalla.
-export function lluviaDeIngredientes(lienzo, emojis, alLlenarse) {
+export function lluviaDeIngredientes(lienzo, iconos, alLlenarse) {
   const ctx = lienzo.getContext("2d");
   const escala = window.devicePixelRatio || 1;
   const ancho = window.innerWidth;
@@ -61,18 +63,18 @@ export function lluviaDeIngredientes(lienzo, emojis, alLlenarse) {
   const anchoColumna = tam * 0.62;
   const columnas = new Array(Math.ceil(ancho / anchoColumna) + 1).fill(0);
   const piezas = [];
-  // Cada emoji se dibuja una sola vez en su propio lienzo; luego solo se copia (mucho más rápido en celular).
-  const sellos = Object.fromEntries(emojis.map((e) => {
-    const c = document.createElement("canvas");
-    const lado = Math.ceil(tam * 1.4 * escala);
-    c.width = c.height = lado;
-    const x = c.getContext("2d");
-    x.font = `${tam * escala}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`;
-    x.textAlign = "center";
-    x.textBaseline = "middle";
-    x.fillText(e, lado / 2, lado / 2 + tam * 0.06 * escala);
-    return [e, c];
-  }));
+  // Cada ícono se pasa una sola vez a su propio lienzo; luego solo se copia (mucho más rápido en celular).
+  const lado = Math.ceil(tam * 1.4 * escala);
+  let sellos = null;
+  imagenesDeIconos(iconos, lado).then((imagenes) => {
+    sellos = Object.fromEntries(Object.entries(imagenes).map(([nombre, img]) => {
+      const c = document.createElement("canvas");
+      c.width = c.height = lado;
+      c.getContext("2d").drawImage(img, lado * 0.1, lado * 0.1, lado * 0.8, lado * 0.8);
+      return [nombre, c];
+    }));
+    requestAnimationFrame(paso);
+  });
   let avisado = false;
   let cuadro = 0;
   let activo = true;
@@ -84,7 +86,7 @@ export function lluviaDeIngredientes(lienzo, emojis, alLlenarse) {
       vy: 2 + Math.random() * 3,
       rot: Math.random() * Math.PI * 2,
       vr: (Math.random() - 0.5) * 0.3,
-      e: emojis[Math.floor(Math.random() * emojis.length)],
+      e: iconos[Math.floor(Math.random() * iconos.length)],
       s: tam * (0.8 + Math.random() * 0.45),
       quieta: false,
     });
@@ -116,8 +118,8 @@ export function lluviaDeIngredientes(lienzo, emojis, alLlenarse) {
       ctx.save();
       ctx.translate(p.x, p.y);
       ctx.rotate(p.rot);
-      const lado = p.s * 1.4;
-      ctx.drawImage(sellos[p.e], -lado / 2, -lado / 2, lado, lado);
+      const l = p.s * 1.4;
+      if (sellos[p.e]) ctx.drawImage(sellos[p.e], -l / 2, -l / 2, l, l);
       ctx.restore();
     }
 
@@ -131,7 +133,6 @@ export function lluviaDeIngredientes(lienzo, emojis, alLlenarse) {
     requestAnimationFrame(paso);
   }
 
-  requestAnimationFrame(paso);
   return () => {
     activo = false;
     ctx.clearRect(0, 0, ancho, alto);

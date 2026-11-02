@@ -7,23 +7,7 @@
 
 let visor = null;
 let alAgregarDesdeRA = () => {};
-const ORBITA = "30deg 62deg auto";
-
-// Quita el brillo "plástico" de la vista 3D: los modelos generados traen un mapa de brillo/metal irregular que
-// hace reflejar la comida como plástico. Se reemplaza por un acabado mate uniforme; el plato queda como cerámica.
-function quitarPlastico() {
-  for (const material of visor.model?.materials ?? []) {
-    const pbr = material.pbrMetallicRoughness;
-    pbr.setMetallicFactor(0);
-    if (pbr.baseColorTexture?.texture) {
-      pbr.metallicRoughnessTexture?.setTexture(null);
-      pbr.setRoughnessFactor(0.74);
-    } else {
-      pbr.setRoughnessFactor(0.38);
-      pbr.setBaseColorFactor([1, 1, 1, 1]); // plato blanco de cerámica
-    }
-  }
-}
+const ORBITA = "30deg 60deg auto";
 
 function etiquetaRA(platillo) {
   const etiqueta = document.createElement("div");
@@ -64,10 +48,7 @@ export function montarVisor(contenedor, platillo, { alAgregar } = {}) {
     visor.setAttribute("camera-controls", "");
     visor.setAttribute("touch-action", "pan-y");
     visor.setAttribute("interaction-prompt", "none");
-    visor.setAttribute("shadow-intensity", "1.4");
-    visor.setAttribute("shadow-softness", "0.85");
-    visor.setAttribute("exposure", "1.1");
-    visor.setAttribute("tone-mapping", "neutral");
+    visor.setAttribute("shadow-intensity", "1");
     visor.setAttribute("camera-orbit", ORBITA);
     visor.setAttribute("min-camera-orbit", "auto 0deg auto");
     visor.setAttribute("max-camera-orbit", "auto 88deg auto");
@@ -81,7 +62,6 @@ export function montarVisor(contenedor, platillo, { alAgregar } = {}) {
     sinBoton.slot = "ar-button";
     sinBoton.hidden = true;
     visor.append(sinBoton);
-    visor.addEventListener("load", quitarPlastico);
     visor.addEventListener("quick-look-button-tapped", () => alAgregarDesdeRA());
   }
   visor.querySelector('[slot="hotspot-nutricion"]')?.remove();
