@@ -1,19 +1,22 @@
 // Efectos de sonido y vibración de las "mini conversiones" (agregar, pedir, pagar...).
 // Los sonidos son los mismos del video de Chefi. Se cargan con Web Audio para que suenen sin retraso.
-// El contexto se crea al cargar la página: si el navegador ya permite el audio, la intro suena desde el inicio;
-// si no, se "desbloquea" con el primer toque.
 // Los de la interfaz (estrellas, caritas, agregar, pagar...) se sintetizan aquí mismo: suaves, cortos y táctiles.
 // Los archivos de media/sfx quedan para la intro y para "se cayó el platillo".
+//
+// Cuándo puede sonar: el navegador solo deja sonar después de un toque válido (soltar el dedo o un clic).
+// - En computadora y Android el contexto de audio se crea al cargar, por si el navegador ya lo permite.
+// - En iPhone se crea dentro del primer toque válido (touchend o click); creado antes nace bloqueado.
+// En cada toque se reintenta arrancar (también sirve al volver de la cámara AR, que lo deja "interrumpido").
 
 const NOMBRES = ["tap", "pop1", "pop3", "pop2", "bubble", "success", "chime", "bell", "slide", "pay2", "nfc",
   "stamp", "swipe", "whoosh1", "whooshlow", "tick", "plate", "shimmer", "assemble2", "logo"];
+export const ES_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && "ontouchend" in document);
 
 let ctx = null;
 let salidaGeneral = null;
 const buffers = {};
-const crudos = {}; // los mp3 sin decodificar, por si hay que recrear el contexto dentro de un toque
-let cargando = null;
-let creadoEnToque = false;
+const decodificando = {}; // nombre → promesa del sonido decodificado
+const crudos = {}; // nombre → promesa del mp3 descargado (sin decodificar)
 
 function crear() {
   if (ctx) return ctx;
@@ -26,83 +29,81 @@ function crear() {
     salidaGeneral.threshold.value = -10;
     salidaGeneral.ratio.value = 3;
     salidaGeneral.connect(ctx.destination);
+    ctx.addEventListener("statechange", vaciarCola);
+    decodificar();
   } catch {
     ctx = null;
   }
   return ctx;
 }
 
-function cargar() {
-  if (cargando || !ctx) return cargando;
-  cargando = Promise.all(NOMBRES.map(async (n) => {
-    try {
-      crudos[n] ??= await (await fetch(`media/sfx/${n}.mp3`)).arrayBuffer();
-      const contexto = ctx;
-      const decodificado = await new Promise((ok, mal) => contexto.decodeAudioData(crudos[n].slice(0), ok, mal));
-      if (contexto === ctx) buffers[n] = decodificado;
-    } catch {}
-  }));
-  return cargando;
+function descargar() {
+  for (const n of NOMBRES) {
+    crudos[n] ??= fetch(`media/sfx/${n}.mp3`).then((r) => r.arrayBuffer()).catch(() => null);
+  }
 }
 
-// Se prepara al cargar la página (sin sonar todavía).
+function decodificar() {
+  if (!ctx) return;
+  descargar();
+  for (const n of NOMBRES) {
+    decodificando[n] ??= crudos[n].then((datos) => datos && new Promise((ok) =>
+      ctx.decodeAudioData(datos.slice(0), (b) => { buffers[n] = b; ok(b); }, () => ok(null))));
+  }
+}
+
+// Se prepara al cargar la página: descarga los sonidos y, fuera de iPhone, crea el contexto.
 export function prepararAudio() {
-  if (crear()) cargar();
+  descargar();
+  if (!ES_IOS) crear();
 }
 
 // true si el navegador ya deja reproducir sonido.
 export const audioActivo = () => ctx?.state === "running";
 
-// Se llama dentro de un toque del usuario. En iPhone el audio solo se desbloquea al soltar el dedo (touchend,
-// click), no al apoyarlo; y al volver de la cámara AR queda "interrumpido", así que se reanuda en cada toque
-// mientras no esté sonando.
-let silencioTocado = false;
-let reanudando = null; // promesa mientras el audio arranca
-
-// Si el audio está arrancando (primer toque), el sonido espera a que arranque en vez de perderse.
+// Lo que se pidió sonar mientras el audio arrancaba; suena en cuanto arranca (si fue hace menos de 1 s).
+const cola = [];
+function vaciarCola() {
+  if (!audioActivo()) return;
+  const ahora = performance.now();
+  for (const { fn, t } of cola.splice(0)) if (ahora - t < 1000) fn();
+}
 function cuandoSuene(fn) {
   if (audioActivo()) return fn();
-  reanudando?.then(() => audioActivo() && fn());
+  if (!ctx) return;
+  cola.push({ fn, t: performance.now() });
 }
+
+// Se llama en cada toque válido.
 export function desbloquearAudio() {
   if (!crear()) return;
-  // iPhone: si el contexto creado al cargar la página no arranca con el toque, se crea uno nuevo aquí mismo
-  // (dentro del toque sí arranca) y se vuelven a decodificar los sonidos.
-  if (ctx.state !== "running" && !creadoEnToque && /iPhone|iPad|Macintosh/.test(navigator.userAgent) && "ontouchend" in document) {
-    creadoEnToque = true;
-    try { ctx.close(); } catch {}
-    ctx = null;
-    cargando = null;
-    for (const n of Object.keys(buffers)) delete buffers[n];
-    crear();
-    silencioTocado = false;
-  }
-  if (ctx.state !== "running" && !reanudando) {
-    reanudando = ctx.resume().catch(() => {}).finally(() => { reanudando = null; });
-  }
-  if (!silencioTocado) {
+  if (ctx.state !== "running") {
+    ctx.resume().then(vaciarCola).catch(() => {});
     // Un sonido vacío dentro del toque termina de "abrir" el audio en Safari.
     try {
       const fuente = ctx.createBufferSource();
       fuente.buffer = ctx.createBuffer(1, 1, 22050);
       fuente.connect(ctx.destination);
       fuente.start(0);
-      silencioTocado = true;
     } catch {}
   }
-  cargar();
 }
 
-// Escucha todos los gestos que sirven para desbloquear el audio.
+// Escucha los gestos que cuentan como toque válido (pointerup y touchstart no cuentan en Safari).
 export function escucharDesbloqueo() {
-  for (const evento of ["touchend", "pointerup", "click", "keydown"]) {
+  for (const evento of ["touchend", "click", "keydown", "mousedown"]) {
     document.addEventListener(evento, desbloquearAudio, { capture: true, passive: true });
   }
 }
 
 export function sonar(nombre, volumen = 0.6) {
   if (!audioActivo()) return cuandoSuene(() => sonar(nombre, volumen));
-  if (!buffers[nombre]) return;
+  if (!buffers[nombre]) {
+    // Recién creado el contexto, el sonido puede estar decodificándose: suena si tarda menos de 1 s.
+    const t = performance.now();
+    decodificando[nombre]?.then((b) => b && performance.now() - t < 1000 && sonar(nombre, volumen));
+    return;
+  }
   const fuente = ctx.createBufferSource();
   const ganancia = ctx.createGain();
   ganancia.gain.value = volumen;
@@ -383,17 +384,23 @@ export function sonidoPropina(porcentaje, conVibracion = true) {
 // Android: Vibration API (patrones de duración; la fuerza la pone el celular).
 // iPhone (iOS 18+): no tiene Vibration API; tocar un interruptor nativo produce un golpe háptico (el del Taptic
 // Engine), con fuerza fija y solo durante un toque del usuario. Los patrones se arman con varios golpes.
-function golpeIOS() {
-  const etiqueta = document.createElement("label");
-  etiqueta.setAttribute("aria-hidden", "true");
-  etiqueta.style.display = "none";
-  const entrada = document.createElement("input");
-  entrada.type = "checkbox";
-  entrada.setAttribute("switch", "");
-  etiqueta.append(entrada);
-  document.head.append(etiqueta);
-  etiqueta.click();
-  etiqueta.remove();
+// El interruptor tiene que estar "dibujado" (dentro de la pantalla aunque invisible): con display:none el
+// iPhone no da el golpe.
+let interruptor = null;
+export function golpeIOS() {
+  if (!interruptor?.isConnected) {
+    interruptor = document.createElement("label");
+    interruptor.setAttribute("aria-hidden", "true");
+    interruptor.style.cssText = "position:fixed;left:0;bottom:0;width:2px;height:2px;overflow:hidden;opacity:.011;pointer-events:none;z-index:-1";
+    const entrada = document.createElement("input");
+    entrada.type = "checkbox";
+    entrada.setAttribute("switch", "");
+    entrada.tabIndex = -1;
+    entrada.style.margin = "0";
+    interruptor.append(entrada);
+    document.body.append(interruptor);
+  }
+  interruptor.click();
 }
 
 // Reproduce un patrón [vibra, pausa, vibra, ...].

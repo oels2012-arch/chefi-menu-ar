@@ -960,3 +960,15 @@ model-viewer[ar-status="session-started"] .etiqueta-ra {
 .aviso-pago .nota { margin: 8px 0 0; color: #fff6ecb3; text-align: left; }
 .gracias-titulo { font-size: clamp(1.2rem, 5.4vw, 1.5rem); }
 @keyframes aviso-pago-entra { from { opacity: 0; transform: translateY(24px) scale(.94); } }
+
+/* ---------- Panel de prueba (?prueba) ---------- */
+.prueba {
+  position: fixed; left: 10px; right: 10px; bottom: calc(10px + var(--abajo)); z-index: 200; max-height: 70vh; overflow: auto;
+  padding: 14px; border-radius: 18px; background: var(--carbon); color: var(--crema); font-size: .85rem; box-shadow: 0 10px 30px #0008;
+}
+.prueba-estado { margin: 6px 0 10px; color: var(--amarillo); }
+.prueba-botones { display: grid; gap: 6px; }
+.prueba button { padding: 10px; border-radius: 12px; border: 0; background: var(--crema); color: var(--carbon); font-weight: 700; text-align: left; }
+.prueba-real { display: flex; align-items: center; justify-content: space-between; margin: 10px 0; padding: 10px; border-radius: 12px; background: #fff6ec1a; font-weight: 700; }
+.prueba-real input { width: 44px; height: 26px; }
+.prueba-log { margin: 0 0 10px; padding-left: 18px; font-size: .78rem; color: #fff6ecb3; }

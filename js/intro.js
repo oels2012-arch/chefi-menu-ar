@@ -4,8 +4,8 @@
 // "chefi". Arranca sola. El navegador no deja sonar ni vibrar hasta que el usuario toca la pantalla: si ya trae el
 // sonido permitido, suena desde el inicio; si no, en cuanto toca se activan el sonido y la vibración.
 
-import { sonar, audioActivo, desbloquearAudio, vibrar } from "./sonido.js?v=202611021445";
-import { icono } from "./iconos.js?v=202611021445";
+import { sonar, audioActivo, desbloquearAudio, vibrar } from "./sonido.js?v=202611021452";
+import { icono } from "./iconos.js?v=202611021452";
 
 const FPS = 30;
 const FIN = 150; // cuadro en que la experiencia entra (el render web duraba 156)
