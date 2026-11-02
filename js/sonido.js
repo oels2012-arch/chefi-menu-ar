@@ -11,7 +11,9 @@ const NOMBRES = ["tap", "pop1", "pop3", "pop2", "bubble", "success", "chime", "b
 let ctx = null;
 let salidaGeneral = null;
 const buffers = {};
+const crudos = {}; // los mp3 sin decodificar, por si hay que recrear el contexto dentro de un toque
 let cargando = null;
+let creadoEnToque = false;
 
 function crear() {
   if (ctx) return ctx;
@@ -34,8 +36,10 @@ function cargar() {
   if (cargando || !ctx) return cargando;
   cargando = Promise.all(NOMBRES.map(async (n) => {
     try {
-      const datos = await (await fetch(`media/sfx/${n}.mp3`)).arrayBuffer();
-      buffers[n] = await new Promise((ok, mal) => ctx.decodeAudioData(datos, ok, mal));
+      crudos[n] ??= await (await fetch(`media/sfx/${n}.mp3`)).arrayBuffer();
+      const contexto = ctx;
+      const decodificado = await new Promise((ok, mal) => contexto.decodeAudioData(crudos[n].slice(0), ok, mal));
+      if (contexto === ctx) buffers[n] = decodificado;
     } catch {}
   }));
   return cargando;
@@ -62,6 +66,17 @@ function cuandoSuene(fn) {
 }
 export function desbloquearAudio() {
   if (!crear()) return;
+  // iPhone: si el contexto creado al cargar la página no arranca con el toque, se crea uno nuevo aquí mismo
+  // (dentro del toque sí arranca) y se vuelven a decodificar los sonidos.
+  if (ctx.state !== "running" && !creadoEnToque && /iPhone|iPad|Macintosh/.test(navigator.userAgent) && "ontouchend" in document) {
+    creadoEnToque = true;
+    try { ctx.close(); } catch {}
+    ctx = null;
+    cargando = null;
+    for (const n of Object.keys(buffers)) delete buffers[n];
+    crear();
+    silencioTocado = false;
+  }
   if (ctx.state !== "running" && !reanudando) {
     reanudando = ctx.resume().catch(() => {}).finally(() => { reanudando = null; });
   }
@@ -165,8 +180,15 @@ function burbuja(frecuencia, cuando, volumen) {
 const PENTATONICA = [1046.5, 1174.7, 1318.5, 1568, 1760];
 
 // Estrellas: una gota por estrella, subiendo hasta la elegida; la última suena un poco más.
-export function sonidoEstrella(valor) {
-  if (!audioActivo()) return cuandoSuene(() => sonidoEstrella(valor));
+export function sonidoEstrella(valor, conVibracion = true) {
+  // Vibración en cascada con las notas: cada estrella un pulso más largo que la anterior (más estrellas, más intenso).
+  if (conVibracion) {
+    const patron = [];
+    for (let i = 0; i < valor; i++) patron.push(35 + i * 25, 30);
+    if (valor === 5) patron.push(220);
+    haptico(patron);
+  }
+  if (!audioActivo()) return cuandoSuene(() => sonidoEstrella(valor, false));
   roce(0, 0.05);
   for (let i = 0; i < valor; i++) {
     const ultima = i === valor - 1;
@@ -177,8 +199,10 @@ export function sonidoEstrella(valor) {
 
 // Caritas: burbuja grave para "mal" y más aguda y doble para "increíble".
 const TONO_CARITA = [330, 392, 494, 587, 659];
-export function sonidoCarita(nivel) {
-  if (!audioActivo()) return cuandoSuene(() => sonidoCarita(nivel));
+const VIBRA_CARITA = [[120], [60], [40, 60, 50], [40, 50, 40, 50, 90], [40, 40, 40, 40, 40, 40, 180]];
+export function sonidoCarita(nivel, conVibracion = true) {
+  if (conVibracion) haptico(VIBRA_CARITA[Math.max(0, Math.min(4, nivel - 1))]);
+  if (!audioActivo()) return cuandoSuene(() => sonidoCarita(nivel, false));
   const i = Math.max(0, Math.min(4, nivel - 1));
   roce(0, 0.04, 3400, 0.014);
   burbuja(TONO_CARITA[i], 0.005, 0.2);
@@ -187,8 +211,9 @@ export function sonidoCarita(nivel) {
 }
 
 // Toque mínimo para chips y motivos.
-export function sonidoToque() {
-  if (!audioActivo()) return cuandoSuene(() => sonidoToque());
+export function sonidoToque(conVibracion = true) {
+  if (conVibracion) haptico([28]);
+  if (!audioActivo()) return cuandoSuene(() => sonidoToque(false));
   roce(0, 0.05, 4200, 0.012);
   gota(1318.5, 0.004, 0.035, 0.12);
 }
@@ -316,23 +341,48 @@ const EFECTOS = {
   publicar: () => [1046.5, 1318.5, 1568].forEach((f, i) => gota(f, i * 0.05, 0.05, 0.4)),
 };
 
-export function efecto(nombre) {
+// Patrón de vibración de cada acción (milisegundos: vibra, pausa, vibra...). En Android es literal; en iPhone se
+// traduce a golpes hápticos con el mismo ritmo.
+const HAPTICOS = {
+  toque: [30],
+  seleccion: [40],
+  abrir: [25, 45, 50],
+  agregar: [45, 60, 110],
+  llega: [35],
+  quitar: [90],
+  mas: [30],
+  menos: [30],
+  enviar: [50, 50, 50, 50, 180], // tac, tac... ¡pum! el ticket sale a cocina
+  preparando: [70, 90, 70],
+  "en-mesa": [180, 90, 180, 90, 320],
+  "pago-tarjeta": [60, 140, 60, 60, 220], // pitido de la terminal y "aprobado"
+  "pago-efectivo": [35, 45, 35, 45, 35, 90, 160], // monedas
+  "pago-en-linea": [40, 50, 80, 50, 200],
+  billete: [45],
+  nfc: [40, 80, 40],
+  publicar: [40, 50, 40, 50, 120],
+  logo: [120, 50, 280],
+};
+
+export function efecto(nombre, conVibracion = true) {
+  if (conVibracion && HAPTICOS[nombre]) haptico(HAPTICOS[nombre]);
   if (!EFECTOS[nombre]) return;
   cuandoSuene(() => EFECTOS[nombre]());
 }
 
 // Propina: un clic que sube de tono con el porcentaje.
-export function sonidoPropina(porcentaje) {
-  if (!audioActivo()) return cuandoSuene(() => sonidoPropina(porcentaje));
+// Propina: cada punto da un clic que se siente más fuerte cuanto más alta la propina; cada 5 % un "tope" marcado.
+export function sonidoPropina(porcentaje, conVibracion = true) {
+  if (conVibracion) haptico(porcentaje % 5 === 0 ? [55 + porcentaje * 2] : [22 + porcentaje]);
+  if (!audioActivo()) return cuandoSuene(() => sonidoPropina(porcentaje, false));
   roce(0, 0.03, 4500, 0.008);
   gota(700 + porcentaje * 22, 0, 0.022, 0.07);
 }
 
 // ---------- Vibración ----------
-// Android: Vibration API. No deja elegir la fuerza, solo la duración, y los pulsos de menos de ~30 ms casi no se
-// sienten; por eso cada pulso se alarga (mínimo 40 ms) y se refuerza.
-// iPhone (iOS 18+): no tiene Vibration API; tocar un interruptor nativo produce un golpe háptico, pero solo dentro
-// de un toque del usuario y siempre con la misma fuerza. Para que se sienta más, los golpes fuertes se repiten.
+// Android: Vibration API (patrones de duración; la fuerza la pone el celular).
+// iPhone (iOS 18+): no tiene Vibration API; tocar un interruptor nativo produce un golpe háptico (el del Taptic
+// Engine), con fuerza fija y solo durante un toque del usuario. Los patrones se arman con varios golpes.
 function golpeIOS() {
   const etiqueta = document.createElement("label");
   etiqueta.setAttribute("aria-hidden", "true");
@@ -346,20 +396,36 @@ function golpeIOS() {
   etiqueta.remove();
 }
 
-const REFUERZO = 2.4;
-export function vibrar(patron = 12) {
+// Reproduce un patrón [vibra, pausa, vibra, ...].
+export function haptico(patron) {
   const pulsos = Array.isArray(patron) ? patron : [patron];
   if (navigator.vibrate) {
-    const fuerte = pulsos.map((ms, i) => (i % 2 === 0 ? Math.min(500, Math.max(40, Math.round(ms * REFUERZO))) : ms));
+    // Android no deja elegir la fuerza: los pulsos de menos de ~30 ms casi no se sienten.
+    const fuerte = pulsos.map((ms, i) => (i % 2 === 0 ? Math.min(600, Math.max(30, ms)) : ms));
     try { navigator.vibrate(fuerte); } catch {}
     return;
   }
-  const encendidos = pulsos.filter((_, i) => i % 2 === 0);
-  const total = encendidos.reduce((a, b) => a + b, 0);
-  const golpes = Math.min(3, Math.max(encendidos.length, total >= 40 ? 2 : 1));
-  golpeIOS();
-  for (let i = 1; i < golpes; i++) setTimeout(golpeIOS, i * 90);
+  // iPhone: un golpe por pulso al mismo ritmo; los pulsos largos (más "pesados") llevan un segundo golpe pegado.
+  let t = 0;
+  const golpes = [];
+  pulsos.forEach((ms, i) => {
+    if (i % 2 === 0) {
+      golpes.push(t);
+      if (ms >= 110) golpes.push(t + 55);
+      if (ms >= 260) golpes.push(t + 110);
+    }
+    t += ms;
+  });
+  let ultimo = -999;
+  for (const g of golpes) {
+    const cuando = Math.max(g, ultimo + 50); // más juntos se funden en uno
+    ultimo = cuando;
+    if (cuando === 0) golpeIOS();
+    else setTimeout(golpeIOS, cuando);
+  }
 }
+
+export const vibrar = haptico;
 
 // Mini conversión: sonido + vibración juntos.
 export function sentir(nombre, patron, volumen) {

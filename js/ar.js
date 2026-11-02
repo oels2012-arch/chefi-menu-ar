@@ -36,7 +36,6 @@ function urlIOS(platillo) {
     checkoutSubtitle: `${platillo.kcal} kcal · ${platillo.porcion} · Carbs ${platillo.carbohidratos}`,
     price: `$${platillo.precio}.00`,
     callToAction: "Agregar al pedido",
-    allowsContentScaling: "0", // siempre a tamaño real: pellizcar no lo agranda
   });
   return `${platillo.modeloIOS}#${datos.toString().replace(/\+/g, "%20")}`;
 }
@@ -56,7 +55,7 @@ export function montarVisor(contenedor, platillo, { alAgregar } = {}) {
     visor.setAttribute("ar", "");
     visor.setAttribute("ar-modes", "webxr scene-viewer quick-look");
     visor.setAttribute("ar-placement", "floor");
-    visor.setAttribute("ar-scale", "fixed"); // siempre a tamaño real
+    visor.setAttribute("ar-scale", "auto"); // abre a tamaño real; se puede pellizcar, mover y girar
     visor.className = "visor-3d";
     // Oculta el botón AR propio de model-viewer: lo abre nuestro botón "Ver en mi mesa".
     const sinBoton = document.createElement("span");

@@ -1,13 +1,13 @@
 // Lógica del menú digital: navegación, grupo, pedido, estado del pedido, cuenta, pago y encuestas.
 // No depende del diseño: busca los elementos por sus atributos data-* (ver README.md).
 
-import { CATEGORIAS, PLATILLOS, PROPINA_INICIAL, MAX_PERSONAS, ALERGIAS, MESERO, RESENA_GOOGLE, NIVELES, CALIFICAR, ASPECTOS_CHEF } from "./datos.js";
-import { montarVisor, verEnMiMesa, reiniciarVisor } from "./ar.js";
-import { vigilarSacudida, lluviaDeIngredientes } from "./caida.js";
-import { prepararAudio, escucharDesbloqueo, desbloquearAudio, sonar, vibrar, sentir, efecto, sonidoEstrella, sonidoCarita, sonidoToque, sonidoPropina } from "./sonido.js";
-import { icono, carita, billete, monedaSvg } from "./iconos.js";
-import { iniciarIntro } from "./intro.js";
-import { iniciarFondo, pedirMovimiento } from "./fondo.js";
+import { CATEGORIAS, PLATILLOS, PROPINA_INICIAL, MAX_PERSONAS, ALERGIAS, MESERO, RESENA_GOOGLE, NIVELES, CALIFICAR, ASPECTOS_CHEF } from "./datos.js?v=202611021445";
+import { montarVisor, verEnMiMesa, reiniciarVisor } from "./ar.js?v=202611021445";
+import { vigilarSacudida, lluviaDeIngredientes } from "./caida.js?v=202611021445";
+import { prepararAudio, escucharDesbloqueo, desbloquearAudio, sonar, vibrar, sentir, efecto, sonidoEstrella, sonidoCarita, sonidoToque, sonidoPropina } from "./sonido.js?v=202611021445";
+import { icono, carita, billete, monedaSvg } from "./iconos.js?v=202611021445";
+import { iniciarIntro } from "./intro.js?v=202611021445";
+import { iniciarFondo, pedirMovimiento } from "./fondo.js?v=202611021445";
 
 const ORDEN = ["bienvenida", "mesa", "menu", "detalle", "pedido", "estado", "pago", "cuenta", "gracias"];
 const FRASES = ["El menú se digitaliza.", "Acerca tu celular.", "Elige tu platillo.", "Míralo en tu mesa.", "Pídelo.",
@@ -17,7 +17,7 @@ const ETAPAS = [
   { a: 5000, titulo: "Preparando tus alimentos", texto: "El chef ya está cocinando." },
   { a: 10000, titulo: "¡Ya está en tu mesa!", texto: "Buen provecho." },
 ];
-const CADA_FRASE = 3800; // ms que dura cada frase del héroe
+const CADA_FRASE = 3000; // ms que dura cada frase del héroe
 const LEYENDA_ESTRELLAS = ["", "Malo", "Regular", "Bueno", "Muy bueno", "Excelente"];
 const COLORES_PERSONA = ["#F26B1D", "#2E9E6A", "#F6C445", "#1F1F1F", "#E0533A", "#4A90C2"];
 const METODOS = { tarjeta: "Tarjeta (terminal en la mesa)", "en-linea": "Pago en línea", efectivo: "Efectivo" };
@@ -322,7 +322,6 @@ function agregar({ desdeRA = false } = {}) {
   estado.pedido.push({ id: estado.actual, cantidad: estado.cantidad, notas, para });
   const p = platillo(estado.actual);
   efecto("agregar");
-  vibrar([30, 40, 70]);
   if (!desdeRA) volarAlPedido(p.foto);
   avisar(`${p.nombre} se agregó a tu pedido`);
   guardar();
@@ -365,7 +364,7 @@ function tirarPlatillo() {
   const p = platillo(estado.actual);
   const caida = ref("caida");
   if (!p?.ingredientes || !caida.hidden || vistaActual() !== "detalle") return;
-  sentir("plate", [200, 60, 120], 0.8);
+  sentir("plate", [260, 80, 160, 80, 320], 0.8);
   document.querySelector(".visor-3d")?.classList.add("cayendo");
   texto("caida-nombre", p.nombre);
   lista("ingredientes").replaceChildren(...p.ingredientes.map(([dibujo, nombre]) => {
@@ -465,8 +464,8 @@ function revisarEtapa() {
   if (etapa <= estado.etapaVista) return;
   estado.etapaVista = etapa;
   guardar();
-  if (etapa === 1) { efecto("preparando"); vibrar([60, 40, 60]); }
-  if (etapa === 2) { efecto("en-mesa"); vibrar([220, 90, 220, 90, 320]); }
+  if (etapa === 1) efecto("preparando");
+  if (etapa === 2) efecto("en-mesa");
   if (vistaActual() === "estado") pintarEstado(true);
   else if (etapa > 0) avisar(etapa === 2 ? "¡Tu pedido ya está en tu mesa!" : "Están preparando tus alimentos", etapa === 2 ? "en-mesa" : "preparando");
 }
@@ -801,14 +800,12 @@ const acciones = {
     estado.personasIguales = 1;
     estado.dividir = "iguales";
     efecto("seleccion");
-    vibrar(15);
     ir("menu");
   },
   "grupo-amigos": () => {
     ref("opcion-amigos").classList.add("activo");
     ref("grupo").hidden = false;
     efecto("seleccion");
-    vibrar(15);
     pintarMesa();
     ref("nombre-persona").focus();
   },
@@ -822,28 +819,26 @@ const acciones = {
     estado.grupo.modo = el.dataset.valor;
     estado.dividir = el.dataset.valor;
     efecto("seleccion");
-    vibrar(15);
     pintarMesa();
   },
   categoria: (el) => { estado.categoria = el.dataset.id; efecto("seleccion"); pintarMenu(); },
   "abrir-platillo": (el) => { efecto("abrir"); ir(`platillo/${el.dataset.id}`); },
   "ver-en-mi-mesa": () => {
     efecto("abrir");
-    vibrar(20);
     const abierto = verEnMiMesa();
     ref("aviso-ar").hidden = abierto;
-    if (abierto) avisar("Apunta a la mesa y mueve el celular despacio", "girar");
+    if (abierto) avisar("Apunta a la mesa · pellizca para cambiar el tamaño", "girar");
   },
-  mas: () => { estado.cantidad++; efecto("mas"); vibrar(10); pintarCantidad(); },
-  menos: () => { estado.cantidad = Math.max(1, estado.cantidad - 1); efecto("menos"); vibrar(10); pintarCantidad(); },
+  mas: () => { estado.cantidad++; efecto("mas"); pintarCantidad(); },
+  menos: () => { estado.cantidad = Math.max(1, estado.cantidad - 1); efecto("menos"); pintarCantidad(); },
   alergia: (el) => {
     const a = el.dataset.valor;
     estado.alergias = estado.alergias.includes(a) ? estado.alergias.filter((x) => x !== a) : [...estado.alergias, a];
-    sentir("bubble", 18, 0.5);
+    sentir("bubble", [45, 40, 30], 0.5);
     pintarAlergias();
     reanimar(lista("alergias").querySelector(`[data-valor="${a}"]`), "rebote");
   },
-  para: (el) => { estado.para = Number(el.dataset.valor); efecto("seleccion"); vibrar(12); pintarParaQuien(); },
+  para: (el) => { estado.para = Number(el.dataset.valor); efecto("seleccion"); pintarParaQuien(); },
   agregar: () => { agregar(); ir("menu"); },
   quitar: (el) => { estado.pedido.splice(Number(el.dataset.indice), 1); efecto("quitar"); pintarPedido(); },
   "enviar-pedido": () => {
@@ -852,7 +847,6 @@ const acciones = {
     estado.pedidoEn = Date.now();
     estado.etapaVista = 0;
     efecto("enviar");
-    vibrar([90, 50, 160, 50, 90]);
     animarSello = true;
     ir("estado");
   },
@@ -864,30 +858,27 @@ const acciones = {
     efecto("seleccion");
     ir("cuenta");
   },
-  dividir: (el) => { estado.dividir = el.dataset.valor; efecto("seleccion"); vibrar(12); pintarDivision(); },
+  dividir: (el) => { estado.dividir = el.dataset.valor; efecto("seleccion"); pintarDivision(); },
   "mas-personas": () => {
     estado.personasIguales = Math.min(MAX_PERSONAS, estado.personasIguales + 1);
     efecto("mas");
-    vibrar(12);
     if (estado.personasIguales === 2) efecto("nfc");
     pintarDivision();
   },
-  "menos-personas": () => { estado.personasIguales = Math.max(1, estado.personasIguales - 1); efecto("menos"); vibrar(12); pintarDivision(); },
+  "menos-personas": () => { estado.personasIguales = Math.max(1, estado.personasIguales - 1); efecto("menos"); pintarDivision(); },
   asignar: (el) => {
     const l = estado.enviados[Number(el.dataset.indice)];
     const n = personas().length;
     l.para = l.para >= n - 1 ? -1 : l.para + 1; // Tú → amigos → "Entre todos" → Tú
     efecto("seleccion");
-    vibrar(12);
     pintarDivision();
   },
-  "quien-paga": (el) => { estado.quienPaga = Number(el.dataset.valor); estado.pagaCon = 0; efecto("seleccion"); vibrar(10); pintarDivision(); },
+  "quien-paga": (el) => { estado.quienPaga = Number(el.dataset.valor); estado.pagaCon = 0; efecto("seleccion"); pintarDivision(); },
   pagar: () => {
     const pago = aPagar();
     const con = estado.metodo === "efectivo" ? opcionesEfectivo(pago.total)[estado.pagaCon] : null;
     estado.ultimoPago = { metodo: estado.metodo, total: pago.total, propina: pago.propina, con };
     efecto(`pago-${estado.metodo}`);
-    vibrar(estado.metodo === "tarjeta" ? [40, 120, 60] : [60, 40, 140]);
     estado.propinas = {};
     estado.enviados = [];
     estado.pedidoEn = null;
@@ -903,7 +894,6 @@ const acciones = {
     if (estado.calif[quien] !== nivel) estado.calif.motivos[quien] = [];
     estado.calif[quien] = nivel;
     sonidoCarita(nivel + 1);
-    vibrar(nivel >= 3 ? [12, 40, 18] : 14);
     pintarCalificacion(quien);
     reanimar(el, "festeja");
     reanimar(ref(`motivos-${quien}`), "aparece");
@@ -914,7 +904,6 @@ const acciones = {
     const motivos = estado.calif.motivos[quien];
     estado.calif.motivos[quien] = motivos.includes(valor) ? motivos.filter((m) => m !== valor) : [...motivos, valor];
     sonidoToque();
-    vibrar(6);
     el.classList.toggle("activo", estado.calif.motivos[quien].includes(valor));
     reanimar(el, "rebote");
   },
@@ -924,7 +913,6 @@ const acciones = {
     if (contenedor.dataset.lista === "aspecto") estado.calif.aspectos[contenedor.dataset.aspecto] = v;
     else estado[{ encuesta: "encuesta", "encuesta-menu": "encuestaMenu", "estrellas-google": "google" }[contenedor.dataset.lista]] = v;
     sonidoEstrella(v);
-    vibrar(8);
     pintarEstrellas(contenedor, v, true);
     pintarGraciasEncuesta();
   },
@@ -932,7 +920,6 @@ const acciones = {
     const resena = ref("texto-google").value.trim();
     if (resena) navigator.clipboard?.writeText(resena).catch(() => {});
     efecto("publicar");
-    vibrar(20);
     window.open(RESENA_GOOGLE, "_blank", "noopener");
   },
   "volver-a-servir": () => { cerrarCaida(); reiniciarVisor(); efecto("abrir"); },
@@ -967,7 +954,6 @@ ref("form-persona").addEventListener("submit", (evento) => {
   estado.grupo.personas.push(nombre[0].toUpperCase() + nombre.slice(1));
   campo.value = "";
   efecto("agregar");
-  vibrar(15);
   pintarMesa();
   guardar();
 });
@@ -979,7 +965,6 @@ ref("propina-rango").addEventListener("input", (evento) => {
   const pago = aPagar();
   if (valor !== pago.pct) {
     sonidoPropina(valor);
-    vibrar(5);
   }
   if (pago.quien === -1) {
     estado.propina = valor; // toda la mesa: la misma para todos
@@ -994,14 +979,13 @@ ref("billete-rango").addEventListener("input", (evento) => {
   const valor = Number(evento.target.value);
   if (valor !== estado.pagaCon) {
     efecto("billete");
-    vibrar(8);
   }
   estado.pagaCon = valor;
   pintarEfectivo();
   guardar();
 });
 
-document.querySelectorAll('input[name="metodo"]').forEach((r) => r.addEventListener("change", () => { efecto("seleccion"); vibrar(10); }));
+document.querySelectorAll('input[name="metodo"]').forEach((r) => r.addEventListener("change", () => efecto("seleccion")));
 
 ref("aviso").addEventListener("animationend", (evento) => {
   if (evento.target.classList.contains("saliendo")) evento.target.hidden = true;

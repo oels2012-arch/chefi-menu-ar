@@ -4,8 +4,8 @@
 // "chefi". Arranca sola. El navegador no deja sonar ni vibrar hasta que el usuario toca la pantalla: si ya trae el
 // sonido permitido, suena desde el inicio; si no, en cuanto toca se activan el sonido y la vibración.
 
-import { sonar, audioActivo, desbloquearAudio, vibrar } from "./sonido.js";
-import { icono } from "./iconos.js";
+import { sonar, audioActivo, desbloquearAudio, vibrar } from "./sonido.js?v=202611021445";
+import { icono } from "./iconos.js?v=202611021445";
 
 const FPS = 30;
 const FIN = 150; // cuadro en que la experiencia entra (el render web duraba 156)
@@ -277,6 +277,7 @@ export function iniciarIntro({ mostrar, mesa }) {
   let tocado = false;
   let arranque = null;
   let ultimo = -1;
+  let sonoLogo = false;
 
   // Escala la escena para que el logo completo quede centrado y nítido en cualquier pantalla.
   function acomodar() {
@@ -314,8 +315,11 @@ export function iniciarIntro({ mostrar, mesa }) {
     const f = ((ahora - arranque) / 1000) * FPS;
     for (const s of SFX) {
       if (s.at > ultimo && s.at <= f) {
-        if (audioActivo()) sonar(s.s, s.v * GANANCIA);
-        if (s.golpe) vibrar([90, 40, 180]); // golpe del logo (Android, si ya tocó la pantalla)
+        if (audioActivo()) {
+          sonar(s.s, s.v * GANANCIA);
+          if (s.golpe) sonoLogo = true;
+        }
+        if (s.golpe) vibrar([120, 50, 280]); // golpe del logo (Android, si ya tocó la pantalla)
       }
     }
     ultimo = f;
@@ -331,7 +335,10 @@ export function iniciarIntro({ mostrar, mesa }) {
     if (tocado) return;
     tocado = true;
     desbloquearAudio();
-    vibrar([40, 60, 60]); // dentro del toque: en iPhone es el único momento en que se puede
+    // Dentro del toque: en iPhone es el único momento en que se puede vibrar, así que va el golpe fuerte del logo.
+    vibrar([120, 50, 280]);
+    // Si el golpe del logo ya pasó sin sonido, suena ahora (espera a que el audio arranque).
+    if (ultimo >= T0 + 54 && !sonoLogo) sonar("logo", 0.8 * GANANCIA);
     aviso.classList.remove("visible");
   };
   intro.addEventListener("click", alTocar);
