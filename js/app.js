@@ -1,14 +1,14 @@
 // Lógica del menú digital: navegación, grupo, pedido, estado del pedido, cuenta, pago y encuestas.
 // No depende del diseño: busca los elementos por sus atributos data-* (ver README.md).
 
-import { CATEGORIAS, PLATILLOS, PROPINA_INICIAL, MAX_PERSONAS, ALERGIAS, MESERO, RESENA_GOOGLE, NIVELES, CALIFICAR, ASPECTOS_CHEF } from "./datos.js?v=202611101131";
-import { montarVisor, verEnMiMesa, reiniciarVisor } from "./ar.js?v=202611101131";
-import { abrirMesa, cerrarMesa, mesaAbierta, eleccionInicial, textoEleccion } from "./mesa.js?v=202611101131";
-import { vigilarSacudida, lluviaDeIngredientes } from "./caida.js?v=202611101131";
-import { prepararAudio, escucharDesbloqueo, desbloquearAudio, sonar, vibrar, sentir, efecto, sonidoEstrella, sonidoCarita, sonidoToque, sonidoPropina } from "./sonido.js?v=202611101131";
-import { icono, carita, billete, monedaSvg } from "./iconos.js?v=202611101131";
-import { iniciarIntro } from "./intro.js?v=202611101131";
-import { iniciarFondo, pedirMovimiento } from "./fondo.js?v=202611101131";
+import { CATEGORIAS, PLATILLOS, PROPINA_INICIAL, MAX_PERSONAS, ALERGIAS, MESERO, RESENA_GOOGLE, NIVELES, CALIFICAR, ASPECTOS_CHEF } from "./datos.js?v=202611101318";
+import { montarVisor, verEnMiMesa, reiniciarVisor } from "./ar.js?v=202611101318";
+import { personalizar, eleccionInicial, textoEleccion } from "./mesa.js?v=202611101318";
+import { vigilarSacudida, lluviaDeIngredientes } from "./caida.js?v=202611101318";
+import { prepararAudio, escucharDesbloqueo, desbloquearAudio, sonar, vibrar, sentir, efecto, sonidoEstrella, sonidoCarita, sonidoToque, sonidoPropina } from "./sonido.js?v=202611101318";
+import { icono, carita, billete, monedaSvg } from "./iconos.js?v=202611101318";
+import { iniciarIntro } from "./intro.js?v=202611101318";
+import { iniciarFondo, pedirMovimiento } from "./fondo.js?v=202611101318";
 
 const ORDEN = ["bienvenida", "mesa", "menu", "detalle", "pedido", "estado", "pago", "cuenta", "gracias"];
 const FRASES = ["El menú se digitaliza.", "Acerca tu celular.", "Elige tu platillo.", "Míralo en tu mesa.", "Pídelo.",
@@ -244,13 +244,14 @@ function pintarDetalle(id) {
   estado.actual = p.id;
   estado.cantidad = 1;
   estado.alergias = [];
-  estado.personal = eleccionInicial(p); // ingredientes puestos o quitados en "En mi mesa"
+  estado.personal = eleccionInicial(p); // ingredientes puestos o quitados con los botones del visor
 
   const raiz = pantalla("detalle");
   const conModelo = Boolean(p.modelo);
   if (conModelo) {
     const visor = montarVisor(ref("visor", raiz), p, { alAgregar: agregarDesdeRA });
     visor.classList.remove("cayendo");
+    personalizar(visor, p, estado.personal, { alCambiar: (eleccion) => { estado.personal = eleccion; } });
     if (!visorVigilado) {
       visorVigilado = true;
       vigilarSacudida(visor, tirarPlatillo);
@@ -275,14 +276,6 @@ function pintarDetalle(id) {
   pintarCantidad();
   pintarAlergias();
   pintarParaQuien();
-  pintarVersion();
-}
-
-// Debajo de "Ver en mi mesa": lo que el comensal cambió del platillo ("Sin lechuga · Con parmesano").
-function pintarVersion() {
-  const cambios = textoEleccion(platillo(estado.actual), estado.personal);
-  ref("tu-version").hidden = !cambios;
-  texto("tu-version-texto", `Tu versión: ${cambios.toLowerCase()}`);
 }
 
 function pintarCantidad() {
@@ -342,7 +335,6 @@ function agregar({ desdeRA = false } = {}) {
 function agregarDesdeRA() {
   agregar({ desdeRA: true });
   pintarBarra();
-  cerrarMesa();
 }
 
 // La foto del platillo vuela hacia la barra del pedido.
@@ -375,7 +367,7 @@ let detenerLluvia = null;
 function tirarPlatillo() {
   const p = platillo(estado.actual);
   const caida = ref("caida");
-  if (!p?.ingredientes || !caida.hidden || vistaActual() !== "detalle" || mesaAbierta()) return;
+  if (!p?.ingredientes || !caida.hidden || vistaActual() !== "detalle") return;
   sentir("plate", [260, 80, 160, 80, 320], 0.8);
   document.querySelector(".visor-3d")?.classList.add("cayendo");
   texto("caida-nombre", p.nombre);
@@ -837,15 +829,6 @@ const acciones = {
   "abrir-platillo": (el) => { efecto("abrir"); ir(`platillo/${el.dataset.id}`); },
   "ver-en-mi-mesa": () => {
     efecto("abrir");
-    const p = platillo(estado.actual);
-    if (p?.personalizar) {
-      // Modo "En mi mesa": se arma el platillo y desde ahí se fija en la mesa con la cámara.
-      abrirMesa(p, estado.personal, {
-        alCambiar: (eleccion) => { estado.personal = eleccion; pintarVersion(); guardar(); },
-        alAgregar: agregarDesdeRA,
-      });
-      return;
-    }
     const abierto = verEnMiMesa();
     ref("aviso-ar").hidden = abierto;
     if (abierto) avisar("Apunta a la mesa · pellizca para cambiar el tamaño", "girar");
@@ -1049,9 +1032,9 @@ precargar();
 pintarIconos();
 texto("mesa", estado.mesa ? `Mesa ${estado.mesa}` : "");
 iniciarFondo();
-window.addEventListener("hashchange", () => { cerrarMesa(); mostrar(); });
+window.addEventListener("hashchange", mostrar);
 setInterval(revisarEtapa, 500);
 iniciarIntro({ mostrar: () => document.body.classList.add("listo"), mesa: estado.mesa ? `Mesa ${estado.mesa}` : "Bienvenido" });
 mostrar();
 // Panel de prueba de sonido y vibración: agregar ?prueba a la dirección.
-if (new URLSearchParams(location.search).has("prueba")) import("./prueba.js?v=202611101131").then((m) => m.abrirPrueba());
+if (new URLSearchParams(location.search).has("prueba")) import("./prueba.js?v=202611101318").then((m) => m.abrirPrueba());

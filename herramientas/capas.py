@@ -545,26 +545,7 @@ def main():
     capas_dir, var_dir = os.path.join(AQUI, "modelos/capas"), os.path.join(AQUI, "modelos/variantes")
     os.makedirs(capas_dir, exist_ok=True); os.makedirs(var_dir, exist_ok=True)
 
-    # Hamburguesa: un nodo por capa. extras.alto = grosor de la capa (el visor la usa para reacomodar la pila).
-    hechas = [(nombre, *fn(), opcional) for nombre, fn, opcional in CAPAS]
-    fijos = [("plato", [plato()], [0, 0, 0], None), ("papas", papas(), [0, 0, 0], None)]
-
-    def pila(activas):
-        y, nodos = PLATO_Y, []
-        for nombre, piezas, alto, opcional in hechas:
-            if opcional and nombre not in activas:
-                continue
-            nodos.append((nombre, piezas, [CENTRO[0], y, CENTRO[2]], {"capa": True, "alto": round(alto, 5), "opcional": opcional}))
-            y += alto
-        return nodos
-
-    opcionales = [n for n, _, _, o in hechas if o]
-    escribir_glb(os.path.join(capas_dir, "hamburguesa.glb"), fijos + pila(opcionales), png)
-    for bits in itertools.product("01", repeat=len(opcionales)):
-        activas = [n for n, b in zip(opcionales, bits) if b == "1"]
-        usdz_nuevo(os.path.join(var_dir, f"hamburguesa_{''.join(bits)}.usdz"), fijos + pila(activas), png)
-    print("hamburguesa: opciones", opcionales)
-
+    # La hamburguesa ya no se dibuja por capas: es la escaneada, con la lechuga separable (herramientas/lechuga.py).
     # Platillos escaneados: el modelo de siempre + los extras en nodos aparte.
     for clave, archivo, extras in [("pasta", "pasta_bolognesa", parmesano()), ("pastel", "postre_pastel", cereza()), ("ensalada", "ensalada", crotones())]:
         nodos = [(nombre, piezas, [0, 0, 0], {"extra": True}) for nombre, piezas in extras]

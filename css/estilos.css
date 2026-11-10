@@ -499,6 +499,36 @@ button, .tarjeta, .metodos label { position: relative; overflow: hidden; }
 }
 .pista-giro [data-icono] { width: 22px; height: 22px; animation: girar-pista 3.2s ease-in-out infinite; }
 @keyframes girar-pista { 0%, 55%, 100% { transform: rotate(0); } 70% { transform: rotate(-14deg); } 85% { transform: rotate(10deg); } }
+/* Arma tu platillo: botones de ingredientes sobre el visor 3D (js/mesa.js). Van dentro de <model-viewer>
+   para que en Android sigan visibles con la cámara de realidad aumentada abierta. */
+.arma { position: absolute; right: 12px; bottom: 48px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; pointer-events: none; }
+.arma[hidden] { display: none; }
+.arma-chip {
+  pointer-events: auto; touch-action: manipulation; display: flex; align-items: center; gap: 7px; min-height: 44px; padding: 4px 6px 4px 4px;
+  border: 2px solid #1f1f1f33; border-radius: 999px; background: #fff6ecd9; color: var(--gris);
+  font: 600 .8rem/1 "Fredoka", var(--texto); white-space: nowrap;
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  transition: background .3s, border-color .3s, color .3s, box-shadow .3s, transform .25s var(--resorte);
+}
+.arma-chip:active { transform: scale(.94); }
+.arma-icono { flex: none; width: 32px; height: 32px; padding: 3px; border-radius: 50%; background: #ffffffa6; filter: grayscale(.9); opacity: .55; transition: filter .35s, opacity .35s, background .35s; }
+.arma-icono svg { width: 100%; height: 100%; display: block; }
+.arma-nombre small { font: inherit; }
+.arma-marca { flex: none; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--naranja); color: #fff; transition: background .3s; }
+.arma-marca svg { grid-area: 1 / 1; width: 13px; height: 13px; transition: transform .35s var(--resorte), opacity .2s; }
+.arma-marca svg:first-child { transform: scale(0) rotate(-40deg); opacity: 0; }
+.arma-chip.activo { border-color: var(--carbon); background: var(--blanco); color: var(--carbon); box-shadow: 3px 3px 0 var(--naranja); }
+.arma-chip.activo .arma-icono { filter: none; opacity: 1; background: var(--crema); }
+.arma-chip.activo .arma-marca { background: var(--verde); }
+.arma-chip.activo .arma-marca svg:first-child { transform: none; opacity: 1; }
+.arma-chip.activo .arma-marca svg:last-child { transform: scale(0) rotate(40deg); opacity: 0; }
+.arma-chip.cambia { animation: rebote .45s var(--resorte); }
+.arma-chip.cambia .arma-icono { animation: arma-salta .5s var(--resorte); }
+@keyframes arma-salta { 35% { transform: translateY(-6px) rotate(-10deg) scale(1.1); } }
+/* Con la cámara abierta (Android): abajo y al centro, más grandes */
+model-viewer[ar-status="session-started"] .arma { left: 0; right: 0; bottom: calc(28px + env(safe-area-inset-bottom)); flex-direction: row; justify-content: center; }
+model-viewer[ar-status="session-started"] .arma-chip { min-height: 52px; padding-right: 10px; font-size: .92rem; }
+
 /* Etiqueta nutricional dentro de la cámara (Android WebXR); en la vista 3D normal no se muestra */
 .etiqueta-ra { display: none; }
 model-viewer[ar-status="session-started"] .etiqueta-ra {
@@ -574,14 +604,6 @@ model-viewer[ar-status="session-started"] .etiqueta-ra {
 .alergia.activo .alergia-check { transform: none; }
 .rebote { animation: rebote .45s var(--resorte); }
 @keyframes rebote { 30% { transform: scale(.88); } 60% { transform: scale(1.08); } }
-
-/* Lo que el comensal cambió en "En mi mesa" */
-.tu-version {
-  display: flex; align-items: center; gap: 8px; margin: -8px 0 18px; padding: 9px 14px; border-radius: 16px;
-  background: #e3f3ea; color: #1d6f49; font: 600 .86rem/1.25 "Fredoka", var(--texto);
-  box-shadow: 0 0 0 1.5px #2e9e6a55;
-}
-.tu-version [data-icono] { flex: none; width: 20px; height: 20px; padding: 4px; border-radius: 50%; background: var(--verde); color: #fff; }
 
 /* Cantidad + agregar: se queda abajo al alcance del pulgar */
 .accion-fija {
@@ -980,107 +1002,3 @@ model-viewer[ar-status="session-started"] .etiqueta-ra {
 .prueba-real { display: flex; align-items: center; justify-content: space-between; margin: 10px 0; padding: 10px; border-radius: 12px; background: #fff6ec1a; font-weight: 700; }
 .prueba-real input { width: 44px; height: 26px; }
 .prueba-log { margin: 0 0 10px; padding-left: 18px; font-size: .78rem; color: #fff6ecb3; }
-
-/* ---------- "En mi mesa": platillo 3D a pantalla completa, cámara de fondo e ingredientes ---------- */
-body.con-enmesa { overflow: hidden; }
-.enmesa {
-  position: fixed; inset: 0; z-index: 90; overflow: hidden;
-  background:
-    radial-gradient(60% 34% at 50% 52%, #ffffffe6 0%, transparent 72%),
-    repeating-radial-gradient(ellipse 130% 70% at 50% 54%, var(--crema-2) 0 28px, var(--papel) 28px 56px);
-  animation: enmesa-entra .35s ease both;
-}
-@keyframes enmesa-entra { from { opacity: 0; transform: scale(1.03); } }
-.enmesa-camara { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .6s ease; }
-.enmesa.con-camara .enmesa-camara { opacity: 1; }
-.enmesa-escena { position: absolute; inset: 0; }
-/* Más alto que la pantalla (sobresale por arriba): así el platillo queda centrado en el espacio libre sobre el panel */
-.enmesa-visor { position: absolute; left: 0; right: 0; bottom: 0; top: -200px; width: 100%; height: auto; display: block; background: transparent; --poster-color: transparent; opacity: 0; transition: opacity .45s ease; }
-.enmesa.cargado .enmesa-visor { opacity: 1; }
-.enmesa-cargando {
-  position: absolute; left: 50%; top: 38%; transform: translate(-50%, -50%); display: flex; align-items: center; gap: 8px;
-  padding: 8px 16px 8px 8px; border-radius: 999px; background: var(--carbon); color: var(--crema); font: 600 .86rem "Fredoka", var(--texto);
-  white-space: nowrap; pointer-events: none; transition: opacity .3s;
-}
-.enmesa-cargando [data-icono] { width: 30px; height: 30px; animation: girar 2.4s linear infinite; }
-.enmesa.cargado .enmesa-cargando { opacity: 0; }
-.enmesa-barra {
-  position: absolute; left: 12px; right: 12px; top: calc(12px + var(--arriba)); display: flex; align-items: center; gap: 10px; pointer-events: none;
-}
-.enmesa-cerrar {
-  flex: none; display: grid; place-items: center; width: 46px; height: 46px; padding: 0; border-radius: 50%; pointer-events: auto;
-  border: var(--borde); background: var(--carbon); color: var(--crema); box-shadow: 3px 3px 0 var(--naranja); transition: transform .12s, box-shadow .12s;
-}
-.enmesa-cerrar:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--naranja); }
-.enmesa-cerrar [data-icono] { width: 20px; height: 20px; }
-.enmesa-titulo {
-  display: grid; margin: 0; padding: 7px 16px 8px; border-radius: 18px; background: var(--carbon); color: var(--crema); line-height: 1.15; min-width: 0;
-}
-.enmesa-titulo small { font: 600 .64rem var(--texto); letter-spacing: .09em; text-transform: uppercase; color: var(--naranja); }
-.enmesa-titulo strong { font: 700 .86rem var(--titulo); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-/* El panel vive dentro de <model-viewer> para que en Android siga visible con la cámara de AR abierta */
-.enmesa-panel {
-  position: absolute; left: 10px; right: 10px; bottom: calc(10px + var(--abajo)); display: grid; gap: 10px; padding: 12px;
-  max-width: 540px; margin: 0 auto; border: var(--borde); border-radius: 26px; background: var(--crema); box-shadow: var(--sombra-dura);
-  pointer-events: auto; touch-action: manipulation; animation: enmesa-panel-sube .5s var(--resorte) .15s both;
-}
-@keyframes enmesa-panel-sube { from { opacity: 0; transform: translateY(40px); } }
-.enmesa-resumen { margin: 0; text-align: center; font: 500 .82rem/1.25 "Fredoka", var(--texto); color: var(--gris); }
-.enmesa-resumen.con-cambios { color: var(--naranja-oscuro); font-weight: 600; }
-.enmesa-opciones { display: flex; justify-content: safe center; gap: 8px; overflow-x: auto; padding: 3px 2px; margin: 0 -2px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
-.enmesa-opciones::-webkit-scrollbar { display: none; }
-.enmesa-chip {
-  position: relative; flex: 1 1 0; min-width: 0; max-width: 108px; display: grid; justify-items: center; gap: 5px; padding: 9px 4px 8px; border: 0; border-radius: 20px;
-  background: #efe8dd; color: #8b7f75; font: 600 .74rem/1.1 "Fredoka", var(--texto); letter-spacing: .01em;
-  box-shadow: 0 0 0 1px #1f1f1f0f inset;
-  transition: background .35s ease, box-shadow .35s ease, color .3s, transform .25s var(--resorte);
-}
-.enmesa-chip:active { transform: scale(.93); }
-.enmesa-chip-icono {
-  width: 40px; height: 40px; padding: 4px; border-radius: 14px; background: #ffffff8c;
-  filter: grayscale(.85); opacity: .5; transition: filter .35s, opacity .35s, transform .45s var(--resorte), box-shadow .35s, background .35s;
-}
-.enmesa-chip-marca {
-  position: absolute; right: 5px; top: 5px; display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%;
-  background: #b9aea3; color: #fff; transition: background .3s, transform .4s var(--resorte), box-shadow .3s;
-}
-.enmesa-chip-marca svg { grid-area: 1 / 1; width: 11px; height: 11px; transition: transform .35s var(--resorte), opacity .2s; }
-.enmesa-chip-marca svg:first-child { transform: scale(0) rotate(-40deg); opacity: 0; }
-.enmesa-chip.activo {
-  background: linear-gradient(180deg, #fffdf9, #fff1e4); color: var(--carbon);
-  box-shadow: 0 1px 0 #fff inset, 0 0 0 1.5px #f26b1d73, 0 8px 14px -10px #c2541c99;
-}
-.enmesa-chip.activo .enmesa-chip-icono { filter: none; opacity: 1; background: #fff; box-shadow: 0 0 0 1px #1f1f1f0d, 0 3px 8px -4px #6e625966; }
-.enmesa-chip.activo .enmesa-chip-marca { background: var(--naranja); box-shadow: 0 2px 6px -1px #f26b1d99; }
-.enmesa-chip.activo .enmesa-chip-marca svg:first-child { transform: none; opacity: 1; }
-.enmesa-chip.activo .enmesa-chip-marca svg:last-child { transform: scale(0) rotate(40deg); opacity: 0; }
-.enmesa-chip.cambia { animation: rebote .45s var(--resorte); }
-.enmesa-chip.cambia .enmesa-chip-icono { animation: enmesa-icono-salta .5s var(--resorte); }
-@keyframes enmesa-icono-salta { 35% { transform: translateY(-7px) rotate(-8deg) scale(1.08); } }
-.enmesa-acciones { display: grid; grid-template-columns: 1.3fr 1fr; gap: 10px; }
-.enmesa-fijar {
-  display: flex; align-items: center; gap: 10px; min-height: 54px; padding: 6px 12px 6px 7px; text-align: left;
-  border: var(--borde); border-radius: 18px; background: var(--carbon); color: var(--crema); box-shadow: 3px 3px 0 var(--naranja);
-  transition: transform .12s, box-shadow .12s;
-}
-.enmesa-fijar:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--naranja); }
-.enmesa-fijar svg { flex: none; width: 38px; height: 38px; padding: 8px; border-radius: 12px; background: var(--naranja); fill: #fff; }
-.enmesa-fijar span { display: grid; font: 700 .8rem/1.15 var(--titulo); }
-.enmesa-fijar small { font: 400 .72rem var(--texto); opacity: .75; }
-.enmesa-panel .enmesa-listo { min-height: 54px; margin: 0; padding: 0 10px; width: 100%; }
-.enmesa-nota { display: none; margin: 0; text-align: center; font-size: .76rem; color: var(--gris); }
-.enmesa.sin-ar .enmesa-fijar { display: none; }
-.enmesa.sin-ar .enmesa-acciones { grid-template-columns: 1fr; }
-.enmesa.sin-ar .enmesa-nota { display: block; }
-/* Con la cámara de AR abierta (Android) solo quedan los ingredientes */
-model-viewer[ar-status="session-started"] .enmesa-acciones, model-viewer[ar-status="session-started"] .enmesa-nota { display: none; }
-@media (max-width: 350px) {
-  .enmesa-panel { padding: 10px; gap: 8px; }
-  .enmesa-opciones { gap: 5px; }
-  .enmesa-chip { font-size: .64rem; padding: 8px 2px 7px; border-radius: 16px; }
-  .enmesa-chip-icono { width: 32px; height: 32px; border-radius: 11px; }
-  .enmesa-chip-marca { right: 2px; top: 2px; width: 16px; height: 16px; }
-  .enmesa-fijar span { font-size: .72rem; }
-}
-@media (prefers-reduced-motion: reduce) { .enmesa, .enmesa-panel { animation: none; } }

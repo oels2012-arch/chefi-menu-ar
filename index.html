@@ -12,9 +12,9 @@
   <link rel="icon" href="img/icono.svg" type="image/svg+xml">
   <link rel="preload" href="img/hero_hamburguesa.webp" as="image" type="image/webp" fetchpriority="high">
   <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="css/estilos.css?v=202611101131">
+  <link rel="stylesheet" href="css/estilos.css?v=202611101318">
   <script type="module" src="https://cdn.jsdelivr.net/npm/@google/model-viewer@3.5.0/dist/model-viewer.min.js"></script>
-  <script type="module" src="js/app.js?v=202611101131"></script>
+  <script type="module" src="js/app.js?v=202611101318"></script>
 </head>
 <body>
   <!--
@@ -190,9 +190,8 @@
       <!-- Función extra: abre la cámara y pone el platillo a escala real sobre la mesa -->
       <button class="boton-ar" data-accion="ver-en-mi-mesa">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 3 7v10l9 5 9-5V7l-9-5Zm0 2.3 6.6 3.7L12 11.7 5.4 8 12 4.3ZM5 9.7l6 3.4v6.6l-6-3.4V9.7Zm8 10v-6.6l6-3.4v6.6l-6 3.4Z"/></svg>
-        <span>Ver en mi mesa<small>Arma tu platillo · tamaño real</small></span>
+        <span>Ver en mi mesa<small>Tamaño real · con su info nutricional</small></span>
       </button>
-      <p class="tu-version" data-ref="tu-version" hidden><span data-icono="check"></span><span data-ref="tu-version-texto"></span></p>
       <p class="aviso-ar" data-ref="aviso-ar" hidden>Abre este menú en tu celular para ver el platillo sobre tu mesa.</p>
 
       <div class="encabezado-platillo">
@@ -415,17 +414,6 @@
   </main>
 
   <!-- Barra inferior con el pedido en curso -->
-  <!-- "En mi mesa": platillo 3D a pantalla completa con la cámara de fondo y botones de ingredientes (js/mesa.js) -->
-  <div class="enmesa" data-ref="en-mesa" hidden>
-    <video class="enmesa-camara" playsinline muted autoplay></video>
-    <div class="enmesa-escena" data-mesa="escena"></div>
-    <div class="enmesa-cargando"><span data-icono="plato"></span>Sirviendo tu platillo…</div>
-    <header class="enmesa-barra">
-      <button class="enmesa-cerrar" data-mesa="cerrar" aria-label="Cerrar"><span data-icono="cerrar"></span></button>
-      <p class="enmesa-titulo"><small>Arma tu platillo</small><strong data-mesa="titulo"></strong></p>
-    </header>
-  </div>
-
   <button class="barra-pedido" data-accion="ir" data-destino="pedido" data-ref="barra-pedido" hidden>
     <span><span class="burbuja" data-ref="barra-cantidad"></span> Ver pedido</span><strong data-ref="barra-total"></strong>
   </button>

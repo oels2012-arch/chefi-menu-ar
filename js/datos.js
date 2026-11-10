@@ -33,13 +33,10 @@ export const PLATILLOS = [
     personalizar: {
       modelo: "modelos/capas/hamburguesa.glb",
       variantes: "modelos/variantes/hamburguesa_{bits}.usdz",
-      opciones: [
-        { id: "queso", nombre: "Queso", icono: "queso", incluido: true, tipo: "capa" },
-        { id: "tocino", nombre: "Tocino", icono: "tocino", incluido: true, tipo: "capa" },
-        { id: "cebolla", nombre: "Cebolla", icono: "cebolla", incluido: true, tipo: "capa" },
-        { id: "jitomate", nombre: "Jitomate", icono: "jitomate", incluido: true, tipo: "capa" },
-        { id: "lechuga", nombre: "Lechuga", icono: "lechuga", incluido: true, tipo: "capa" },
-      ],
+      fijas: { 1: "modelos/fuerte_hamburguesa.usdz" },
+      opciones: [{ id: "lechuga", nombre: "Lechuga", icono: "lechuga", incluido: true, tipo: "anillo" }],
+      // Al quitar la lechuga, lo de arriba se asienta. Mismas medidas (metros) que herramientas/lechuga.py.
+      asentar: { con: "lechuga", centro: [0.006, 0.04], radio: [0.058, 0.066], frente: [-0.012, 0], banda: [0.029, 0.042], baja: 0.013 },
     },
   },
   {

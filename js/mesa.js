@@ -1,22 +1,22 @@
-// Modo "En mi mesa": el platillo en 3D a pantalla completa, con la cámara del celular de fondo y botones para
-// quitar o poner ingredientes. Cada cambio se ve en el modelo al momento, con animación de entrada y de salida.
-// Desde aquí "Fijar en mi mesa" abre la realidad aumentada con el platillo ya personalizado:
+// Arma tu platillo: botones para quitar o poner ingredientes sobre el modelo 3D de siempre (el visor del platillo).
+// Cada cambio se ve en el modelo al momento, con animación de entrada y de salida, y "Ver en mi mesa" abre la
+// realidad aumentada con el platillo tal como quedó:
 // - iPhone: AR Quick Look con el USDZ de esa combinación (la cámara de Apple no admite botones propios,
-//   por eso los ingredientes se eligen aquí, antes de fijarlo).
+//   por eso los ingredientes se eligen antes de abrirla).
 // - Android: WebXR; los mismos botones siguen visibles dentro de la cámara y el modelo cambia en vivo.
 //
-// Los modelos de modelos/capas/ traen cada ingrediente en su propio nodo (ver herramientas/capas.py):
-// - "capa" (hamburguesa): nodos con extras.capa y extras.alto; al quitar una, las de arriba bajan.
-// - "lluvia" (parmesano, crotones): varios nodos que caen escalonados.
-// - "posar" (cereza): una pieza que cae, rebota y se asienta.
+// Los modelos de modelos/capas/ son los platillos escaneados con cada ingrediente en su propio nodo:
+// - "anillo" (lechuga de la hamburguesa, herramientas/lechuga.py): sale del modelo original; al quitarla,
+//   lo de arriba se asienta (personalizar.asentar).
+// - "lluvia" (parmesano, crotones) y "posar" (cereza): extras agregados con herramientas/capas.py.
 
-import { icono } from "./iconos.js?v=202611101131";
-import { efecto, vibrar } from "./sonido.js?v=202611101131";
+import { icono } from "./iconos.js?v=202611101318";
+import { efecto, vibrar } from "./sonido.js?v=202611101318";
 
 const ES_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && "ontouchend" in document);
-const ORBITA = "28deg 62deg 112%";
 
-let actual = null; // { platillo, visor, eleccion, piezas, capas, escena, avisos, flujo }
+let actual = null; // { platillo, visor, eleccion, lista, piezas, todas, cuerpo, escena, alCambiar }
+let cache = null; // piezas ya preparadas del modelo que está cargado en el visor
 
 // ---------- Elección ----------
 export function eleccionInicial(platillo) {
@@ -143,7 +143,7 @@ function encender() {
 
 function cuadro(ahora) {
   cuadroPedido = 0;
-  if (!actual?.piezas) return;
+  if (!actual?.todas) return;
   let vivos = false;
   for (const p of actual.todas) {
     if (!p.cola.length) continue;
@@ -163,7 +163,7 @@ function cuadro(ahora) {
       if (t >= 1) m.fuera = true;
     }
     p.cola = p.cola.filter((m) => !m.fuera);
-    aplicar(p);
+    (p.aplicar ?? aplicar)(p);
     vivos ||= p.cola.length > 0;
   }
   actual.escena.queueShadowRender?.();
@@ -179,93 +179,99 @@ function prepararEscena() {
   actual.escena = escena;
   const nombres = [];
   escena.traverse((o) => { if (o.name) nombres.push(o); });
-  actual.piezas = {};
-  actual.todas = [];
-  for (const opcion of platillo.personalizar.opciones) {
-    const es = (o) => o?.name === opcion.id || o?.name?.startsWith(`${opcion.id}_`);
-    // Solo el nodo de arriba (los hijos de un grupo se llaman igual con _1, _2...).
-    const piezas = nombres.filter((o) => es(o) && !es(o.parent)).map(crearPieza);
-    actual.piezas[opcion.id] = piezas;
-    actual.todas.push(...piezas);
+  // Si es el mismo modelo que ya estaba preparado (volvieron a abrir el platillo) se reutilizan sus piezas.
+  if (cache?.llave !== nombres[0] || cache.id !== platillo.id) {
+    const piezas = {}, todas = [];
+    for (const opcion of platillo.personalizar.opciones) {
+      const es = (o) => o?.name === opcion.id || o?.name?.startsWith(`${opcion.id}_`);
+      // Solo el nodo de arriba (los hijos de un grupo se llaman igual con _1, _2...).
+      piezas[opcion.id] = nombres.filter((o) => es(o) && !es(o.parent)).map(crearPieza);
+      todas.push(...piezas[opcion.id]);
+    }
+    const regla = platillo.personalizar.asentar;
+    const cuerpo = regla ? crearCuerpo(nombres.find((o) => o.name === "cuerpo"), regla) : null;
+    if (cuerpo) todas.push(cuerpo);
+    cache = { llave: nombres[0], id: platillo.id, piezas, todas, cuerpo };
   }
-  // Hamburguesa: la pila completa, de abajo hacia arriba (incluye pan y carne, que no se quitan).
-  const deCapa = nombres.filter((o) => o.userData?.capa).sort((a, b) => a.position.y - b.position.y);
-  actual.capas = deCapa.map((obj) => {
-    const pieza = actual.todas.find((p) => p.obj === obj) ?? crearPieza(obj);
-    if (!actual.todas.includes(pieza)) actual.todas.push(pieza);
-    pieza.alto = obj.userData.alto;
-    pieza.id = platillo.personalizar.opciones.find((o) => o.id === obj.name)?.id ?? null;
-    return pieza;
-  });
-  actual.base = actual.capas[0]?.p0.y ?? 0;
+  Object.assign(actual, { piezas: cache.piezas, todas: cache.todas, cuerpo: cache.cuerpo });
   // Estado inicial sin animación.
   for (const opcion of platillo.personalizar.opciones) {
-    if (eleccion[opcion.id]) continue;
-    for (const p of actual.piezas[opcion.id]) p.obj.visible = false;
+    for (const p of actual.piezas[opcion.id]) {
+      parar(p);
+      Object.assign(p.e, NEUTRO);
+      p.obj.visible = Boolean(eleccion[opcion.id]);
+      aplicar(p);
+    }
   }
-  for (const [capa, dy] of destinos()) { capa.e.dy = dy; aplicar(capa); }
+  if (actual.cuerpo) {
+    parar(actual.cuerpo);
+    actual.cuerpo.e.m = eleccion[platillo.personalizar.asentar.con] ? 0 : 1;
+    actual.cuerpo.aplicar(actual.cuerpo);
+  }
   escena.queueShadowRender?.();
   escena.queueRender();
   return true;
 }
 
-// A qué altura (relativa a la suya de origen) debe quedar cada capa según lo que está puesto.
-function destinos() {
-  let y = actual.base;
-  const mapa = new Map();
-  for (const capa of actual.capas) {
-    if (capa.id && !actual.eleccion[capa.id]) continue;
-    mapa.set(capa, y - capa.p0.y);
-    y += capa.alto;
+// ---------- Poner y quitar ----------
+// La hamburguesa escaneada: todo lo que está arriba de la lechuga baja (m = 1) o regresa a su lugar (m = 0).
+// Misma regla que herramientas/lechuga.py, que hace la versión sin lechuga para la cámara del iPhone.
+function crearCuerpo(obj, regla) {
+  let malla = null;
+  obj?.traverse((o) => { if (!malla && o.isMesh) malla = o; });
+  const pos = malla?.geometry?.getAttribute("position");
+  if (!pos || pos.isInterleavedBufferAttribute || !(pos.array instanceof Float32Array)) return null;
+  const escalon = (a, b, x) => Math.min(1, Math.max(0, (x - a) / (b - a)));
+  const suave = (a, b, x) => { const t = escalon(a, b, x); return t * t * (3 - 2 * t); };
+  const y0 = new Float32Array(pos.count), baja = new Float32Array(pos.count);
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    const r = Math.hypot(x - regla.centro[0], z - regla.centro[1]);
+    const esHamburguesa = Math.max(1 - suave(regla.radio[0], regla.radio[1], r), suave(regla.frente[0], regla.frente[1], z));
+    y0[i] = y;
+    baja[i] = regla.baja * esHamburguesa * escalon(regla.banda[0], regla.banda[1], y);
   }
-  return mapa;
+  return {
+    e: { m: 0 }, cola: [],
+    aplicar(p) {
+      for (let i = 0; i < pos.count; i++) pos.setY(i, y0[i] - baja[i] * p.e.m);
+      pos.needsUpdate = true;
+    },
+  };
 }
 
-// ---------- Poner y quitar ----------
-function animarCapa(id, poner) {
-  const pieza = actual.piezas[id][0];
-  const indice = actual.capas.indexOf(pieza);
-  const arriba = actual.capas.slice(indice + 1).filter((c) => !c.id || actual.eleccion[c.id]);
-  const destino = destinos();
-  const lado = indice % 2 ? 1 : -1; // entran y salen alternando el lado
-  parar(pieza);
-  arriba.forEach(parar);
-  if (poner) {
-    const dy = destino.get(pieza);
-    // Las de arriba se levantan para abrir espacio...
-    arriba.forEach((c) => mover(c, { dy: destino.get(c) + 0.05 }, 220, "suave"));
-    // ...el ingrediente entra girando desde un lado y se acomoda...
-    Object.assign(pieza.e, { dx: lado * 0.1, dy: dy + 0.022, s: 0.35, ry: lado * 1.1, op: 0, sy: 1 });
-    pieza.obj.visible = true;
-    aplicar(pieza);
-    mover(pieza, { op: 1 }, 160);
-    mover(pieza, { dx: 0, s: 1, ry: 0 }, 420, "rebote", 40);
-    mover(pieza, { dy: dy + 0.014 }, 340, "suave", 40);
-    mover(pieza, { dy }, 200, "cae", 400);
-    mover(pieza, { sy: 0.82 }, 90, "suave", 590);
-    mover(pieza, { sy: 1 }, 320, "rebote", 680);
-    // ...y las de arriba caen encima con un rebote.
-    arriba.forEach((c, k) => {
-      mover(c, { dy: destino.get(c) }, 300, "bote", 520 + k * 45);
-      mover(c, { sy: 0.9 }, 80, "suave", 700 + k * 45);
-      mover(c, { sy: 1 }, 300, "rebote", 780 + k * 45);
-    });
-    setTimeout(() => vibrar([55]), 600); // el "pum" al asentarse (dentro de 1 s del toque: el iPhone sí vibra)
-  } else {
-    const dy = pieza.e.dy;
-    const ficha = (pieza.ficha = (pieza.ficha ?? 0) + 1);
-    arriba.forEach((c) => mover(c, { dy: c.e.dy + 0.026 }, 200, "suave"));
-    mover(pieza, { dy: dy + 0.02 }, 200, "suave");
-    mover(pieza, { dx: lado * 0.11, ry: lado * -1.2, s: 0.3, dy: dy + 0.06 }, 340, "entra", 170);
-    mover(pieza, { op: 0 }, 180, "suave", 330).then(() => {
-      if (pieza.ficha === ficha && !actual?.eleccion[id]) pieza.obj.visible = false;
-    });
-    arriba.forEach((c, k) => {
-      mover(c, { dy: destino.get(c) }, 320, "bote", 380 + k * 45);
-      mover(c, { sy: 0.9 }, 80, "suave", 570 + k * 45);
-      mover(c, { sy: 1 }, 300, "rebote", 650 + k * 45);
-    });
-    setTimeout(() => vibrar([40]), 600);
+// Un ingrediente que rodea al platillo (la lechuga): se abre girando y se desvanece; al volver, se cierra con rebote.
+function animarAnillo(id, poner) {
+  const cuerpo = actual.cuerpo;
+  if (cuerpo) parar(cuerpo);
+  for (const p of actual.piezas[id]) {
+    parar(p);
+    if (poner) {
+      // La hamburguesa se levanta un poco para abrir espacio...
+      if (cuerpo) mover(cuerpo, { m: -0.45 }, 240, "suave");
+      // ...la lechuga entra girando y se ajusta...
+      Object.assign(p.e, { s: 1.32, ry: -0.9, dy: 0.012, op: 0, sy: 1 });
+      p.obj.visible = true;
+      aplicar(p);
+      mover(p, { op: 1 }, 200, "suave", 60);
+      mover(p, { s: 1, ry: 0 }, 480, "rebote", 60);
+      mover(p, { dy: 0 }, 380, "suave", 60);
+      // ...y todo cae encima con un rebote.
+      if (cuerpo) mover(cuerpo, { m: 0 }, 380, "bote", 400);
+      mover(p, { sy: 0.8 }, 90, "suave", 620);
+      mover(p, { sy: 1 }, 340, "rebote", 710);
+      setTimeout(() => vibrar([55]), 640); // el "pum" al asentarse (dentro de 1 s del toque: el iPhone sí vibra)
+    } else {
+      const ficha = (p.ficha = (p.ficha ?? 0) + 1);
+      if (cuerpo) mover(cuerpo, { m: -0.3 }, 180, "suave");
+      mover(p, { s: 0.95 }, 120, "suave");
+      mover(p, { s: 1.34, ry: 0.9, dy: 0.01 }, 400, "suave", 120);
+      mover(p, { op: 0 }, 240, "suave", 260).then(() => {
+        if (p.ficha === ficha && !actual?.eleccion[id]) p.obj.visible = false;
+      });
+      if (cuerpo) mover(cuerpo, { m: 1 }, 400, "bote", 300);
+      setTimeout(() => vibrar([40]), 560);
+    }
   }
 }
 
@@ -326,26 +332,26 @@ function alternar(id) {
   actual.eleccion = { ...actual.eleccion, [id]: poner };
   efecto(poner ? "poner" : "retirar");
   if (actual.piezas?.[id]?.length) {
-    ({ capa: animarCapa, lluvia: animarLluvia, posar: animarPosar })[opcion.tipo ?? "capa"](id, poner);
+    ({ anillo: animarAnillo, lluvia: animarLluvia, posar: animarPosar })[opcion.tipo ?? "posar"](id, poner);
   }
   pintarOpciones();
   ponerVariante();
-  actual.avisos.alCambiar?.(actual.eleccion);
+  actual.alCambiar?.(actual.eleccion);
 }
 
-// ---------- Pantalla ----------
+// ---------- Botones ----------
 function pintarOpciones() {
   const { platillo, eleccion, lista } = actual;
   if (!lista.childElementCount) {
     lista.innerHTML = platillo.personalizar.opciones.map((o) => `
-      <button class="enmesa-chip" data-mesa-opcion="${o.id}">
-        <span class="enmesa-chip-icono">${icono(o.icono)}</span>
-        <span class="enmesa-chip-nombre">${o.nombre}</span>
-        <span class="enmesa-chip-marca">${icono("check")}${icono("suma")}</span>
+      <button class="arma-chip" data-arma="${o.id}">
+        <span class="arma-icono">${icono(o.icono)}</span>
+        <span class="arma-nombre"><small></small> ${o.nombre.toLowerCase()}</span>
+        <span class="arma-marca">${icono("check")}${icono("suma")}</span>
       </button>`).join("");
   }
   for (const chip of lista.children) {
-    const puesto = Boolean(eleccion[chip.dataset.mesaOpcion]);
+    const puesto = Boolean(eleccion[chip.dataset.arma]);
     if (chip.classList.contains("activo") !== puesto && chip.dataset.pintado) {
       chip.classList.remove("cambia");
       void chip.offsetWidth;
@@ -354,10 +360,9 @@ function pintarOpciones() {
     chip.dataset.pintado = "1";
     chip.classList.toggle("activo", puesto);
     chip.setAttribute("aria-pressed", puesto);
+    const opcion = platillo.personalizar.opciones.find((o) => o.id === chip.dataset.arma);
+    chip.querySelector("small").textContent = puesto ? "Con" : opcion.incluido ? "Sin" : "Agregar";
   }
-  const cambios = textoEleccion(platillo, eleccion);
-  actual.resumen.textContent = cambios || "Toca un ingrediente para quitarlo o ponerlo";
-  actual.resumen.classList.toggle("con-cambios", Boolean(cambios));
 }
 
 // Deja listo el archivo de AR de la combinación actual (y en iPhone lo va bajando).
@@ -371,125 +376,28 @@ function ponerVariante() {
   bajada = setTimeout(() => fetch(url, { priority: "low" }).catch(() => {}), 500);
 }
 
-async function encenderCamara() {
-  const { raiz, video } = actual;
-  if (!navigator.mediaDevices?.getUserMedia) return;
-  try {
-    const flujo = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 } }, audio: false });
-    if (!actual || actual.video !== video) return flujo.getTracks().forEach((t) => t.stop());
-    actual.flujo = flujo;
-    video.srcObject = flujo;
-    await video.play().catch(() => {});
-    raiz.classList.add("con-camara");
-  } catch {
-    raiz.classList.remove("con-camara"); // sin permiso de cámara se queda el fondo del menú
+// Conecta los botones de ingredientes al visor del platillo. Se llama cada vez que se abre un platillo;
+// si el platillo no se puede personalizar, solo desconecta lo anterior.
+export function personalizar(visor, platillo, eleccion, { alCambiar } = {}) {
+  let lista = visor.querySelector(".arma");
+  if (!lista) {
+    // Dentro del visor (no afuera) para que en Android los botones sigan visibles con la cámara de AR abierta.
+    lista = document.createElement("div");
+    lista.className = "arma";
+    visor.append(lista);
+    lista.addEventListener("click", (evento) => {
+      const chip = evento.target.closest("[data-arma]");
+      if (chip && actual) alternar(chip.dataset.arma);
+    });
+    // Que tocar un botón no gire el modelo.
+    for (const tipo of ["pointerdown", "touchstart", "mousedown"]) lista.addEventListener(tipo, (e) => e.stopPropagation());
+    visor.addEventListener("load", () => { if (actual?.visor === visor) prepararEscena(); });
   }
-}
-
-function apagarCamara() {
-  actual?.flujo?.getTracks().forEach((t) => t.stop());
-  if (actual) actual.flujo = null;
-}
-
-// Al volver de la cámara de AR (o de otra app) el video puede quedar congelado: se vuelve a pedir.
-function alVolver() {
-  if (!actual || document.visibilityState !== "visible") return;
-  const vivo = actual.flujo?.getVideoTracks().some((t) => t.readyState === "live" && !t.muted);
-  if (!vivo || actual.video.paused) {
-    apagarCamara();
-    encenderCamara();
-  }
-}
-
-export function mesaAbierta() {
-  return Boolean(actual);
-}
-
-export function cerrarMesa() {
-  if (!actual) return;
-  const { raiz, visor, avisos, eleccion } = actual;
-  apagarCamara();
-  actual.video.srcObject = null;
-  raiz.hidden = true;
-  raiz.classList.remove("con-camara", "cargado");
-  document.body.classList.remove("con-enmesa");
-  visor.remove();
-  actual = null;
-  avisos.alCerrar?.(eleccion);
-}
-
-function fijar() {
-  const { visor, raiz } = actual;
-  if (!visor.canActivateAR) {
-    raiz.classList.add("sin-ar");
-    return;
-  }
-  efecto("abrir");
-  ponerVariante();
-  visor.activateAR();
-}
-
-// Abre el modo "En mi mesa". eleccion = { idIngrediente: true/false }.
-export function abrirMesa(platillo, eleccion, avisos = {}) {
-  if (actual) cerrarMesa();
-  const raiz = document.querySelector('[data-ref="en-mesa"]');
-  const visor = document.createElement("model-viewer");
-  for (const [k, v] of Object.entries({
-    "camera-controls": "", "touch-action": "none", "interaction-prompt": "none", "shadow-intensity": "1.1",
-    "shadow-softness": "0.9", "camera-orbit": ORBITA, "min-camera-orbit": "auto 15deg auto", "max-camera-orbit": "auto 86deg auto",
-    ar: "", "ar-modes": "webxr scene-viewer quick-look", "ar-placement": "floor", "ar-scale": "auto",
-    src: platillo.personalizar.modelo, alt: `Modelo 3D de ${platillo.nombre}`,
-  })) visor.setAttribute(k, v);
-  visor.className = "enmesa-visor";
-  // Dentro del visor (no afuera) para que en Android los botones sigan visibles con la cámara de AR abierta.
-  visor.innerHTML = `
-    <span slot="ar-button" hidden></span>
-    <div class="enmesa-panel">
-      <p class="enmesa-resumen" data-mesa="resumen"></p>
-      <div class="enmesa-opciones" data-mesa="opciones"></div>
-      <div class="enmesa-acciones">
-        <button class="enmesa-fijar" data-mesa="fijar">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 3 7v10l9 5 9-5V7l-9-5Zm0 2.3 6.6 3.7L12 11.7 5.4 8 12 4.3ZM5 9.7l6 3.4v6.6l-6-3.4V9.7Zm8 10v-6.6l6-3.4v6.6l-6 3.4Z"/></svg>
-          <span>Fijar en mi mesa<small>Tamaño real</small></span>
-        </button>
-        <button class="boton-principal enmesa-listo" data-mesa="listo">Listo</button>
-      </div>
-      <p class="enmesa-nota" data-mesa="nota">Abre el menú en tu celular para fijarlo sobre tu mesa a tamaño real.</p>
-    </div>`;
-  raiz.querySelector('[data-mesa="escena"]').replaceChildren(visor);
-  raiz.querySelector('[data-mesa="titulo"]').textContent = platillo.nombre;
-  actual = {
-    platillo, visor, raiz, avisos,
-    eleccion: { ...eleccionInicial(platillo), ...eleccion },
-    video: raiz.querySelector("video"),
-    lista: visor.querySelector('[data-mesa="opciones"]'),
-    resumen: visor.querySelector('[data-mesa="resumen"]'),
-    piezas: null, todas: [], capas: [],
-  };
-  raiz.hidden = false;
-  raiz.classList.remove("sin-ar", "cargado");
-  document.body.classList.add("con-enmesa");
+  lista.replaceChildren();
+  lista.hidden = !platillo.personalizar;
+  if (!platillo.personalizar) { actual = null; return; }
+  actual = { platillo, visor, lista, alCambiar, eleccion: { ...eleccionInicial(platillo), ...eleccion }, piezas: null, todas: [], cuerpo: null };
   pintarOpciones();
   ponerVariante();
-  encenderCamara();
-  visor.addEventListener("load", () => {
-    if (actual?.visor !== visor) return;
-    prepararEscena();
-    raiz.classList.add("cargado");
-    raiz.classList.toggle("sin-ar", !visor.canActivateAR);
-  }, { once: true });
-  visor.addEventListener("quick-look-button-tapped", () => actual?.avisos.alAgregar?.(actual.eleccion));
-  visor.addEventListener("click", (evento) => {
-    const boton = evento.target.closest("[data-mesa-opcion], [data-mesa]");
-    if (!boton || !actual) return;
-    if (boton.dataset.mesaOpcion) alternar(boton.dataset.mesaOpcion);
-    else if (boton.dataset.mesa === "fijar") fijar();
-    else if (boton.dataset.mesa === "listo") { efecto("toque"); cerrarMesa(); }
-  });
+  if (visor.loaded) prepararEscena(); // mismo modelo que ya estaba cargado
 }
-
-document.addEventListener("visibilitychange", alVolver);
-window.addEventListener("pageshow", alVolver);
-document.addEventListener("click", (evento) => {
-  if (actual && evento.target.closest('[data-mesa="cerrar"]')) { efecto("toque"); cerrarMesa(); }
-});

@@ -1,7 +1,7 @@
 // "Se cayó el platillo": si el comensal gira el 3D con mucha fuerza (o sacude el celular),
 // el platillo se cae y la pantalla se llena con sus ingredientes (dibujados en SVG, ver js/iconos.js).
 
-import { imagenesDeIconos } from "./iconos.js?v=202611101131";
+import { imagenesDeIconos } from "./iconos.js?v=202611101318";
 
 const VUELTAS_PARA_CAER = 1.6; // vueltas acumuladas en menos de un segundo
 const VENTANA_MS = 1000;

@@ -66,7 +66,7 @@ export function montarVisor(contenedor, platillo, { alAgregar } = {}) {
   }
   visor.querySelector('[slot="hotspot-nutricion"]')?.remove();
   visor.append(etiquetaRA(platillo));
-  visor.setAttribute("src", platillo.modelo);
+  visor.setAttribute("src", platillo.personalizar?.modelo ?? platillo.modelo);
   const ios = urlIOS(platillo);
   if (ios) visor.setAttribute("ios-src", ios);
   else visor.removeAttribute("ios-src");
