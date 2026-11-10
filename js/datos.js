@@ -28,6 +28,19 @@ export const PLATILLOS = [
     carne: "120 g",
     contiene: "Gluten, lácteos",
     ingredientes: [["pan","Pan brioche"],["carne","Carne de res"],["queso","Queso cheddar"],["tocino","Tocino"],["cebolla","Aros de cebolla"],["lechuga","Lechuga"],["jitomate","Jitomate"],["papas","Papas"]],
+    // "En mi mesa": ingredientes que se pueden quitar o poner sobre el modelo 3D (ver js/mesa.js y herramientas/capas.py).
+    // El orden de las opciones es el de los bits del archivo de AR (modelos/variantes/<platillo>_<bits>.usdz).
+    personalizar: {
+      modelo: "modelos/capas/hamburguesa.glb",
+      variantes: "modelos/variantes/hamburguesa_{bits}.usdz",
+      opciones: [
+        { id: "queso", nombre: "Queso", icono: "queso", incluido: true, tipo: "capa" },
+        { id: "tocino", nombre: "Tocino", icono: "tocino", incluido: true, tipo: "capa" },
+        { id: "cebolla", nombre: "Cebolla", icono: "cebolla", incluido: true, tipo: "capa" },
+        { id: "jitomate", nombre: "Jitomate", icono: "jitomate", incluido: true, tipo: "capa" },
+        { id: "lechuga", nombre: "Lechuga", icono: "lechuga", incluido: true, tipo: "capa" },
+      ],
+    },
   },
   {
     id: "pasta",
@@ -46,6 +59,12 @@ export const PLATILLOS = [
     carne: "80 g",
     contiene: "Gluten, lácteos",
     ingredientes: [["spaghetti","Spaghetti"],["carne","Res molida"],["salsa","Salsa de jitomate"],["ajo","Ajo"],["parmesano","Parmesano"],["albahaca","Albahaca"]],
+    personalizar: {
+      modelo: "modelos/capas/pasta.glb",
+      variantes: "modelos/variantes/pasta_{bits}.usdz",
+      fijas: { 0: "modelos/pasta_bolognesa.usdz" },
+      opciones: [{ id: "parmesano", nombre: "Parmesano", icono: "parmesano", incluido: false, tipo: "lluvia" }],
+    },
   },
   {
     id: "ensalada",
@@ -64,6 +83,12 @@ export const PLATILLOS = [
     carne: "Sin carne",
     contiene: "Sin alérgenos comunes",
     ingredientes: [["lechuga","Lechugas"],["tomate","Jitomate cherry"],["pepino","Pepino"],["aguacate","Aguacate"],["aceituna","Vinagreta de oliva"]],
+    personalizar: {
+      modelo: "modelos/capas/ensalada.glb",
+      variantes: "modelos/variantes/ensalada_{bits}.usdz",
+      fijas: { 0: "modelos/ensalada.usdz" },
+      opciones: [{ id: "crotones", nombre: "Crotones", icono: "crotones", incluido: false, tipo: "lluvia" }],
+    },
   },
   {
     id: "pastel",
@@ -82,6 +107,12 @@ export const PLATILLOS = [
     carne: "Sin carne",
     contiene: "Gluten, lácteos, huevo",
     ingredientes: [["chocolate","Chocolate"],["harina","Harina"],["huevo-entero","Huevo"],["mantequilla","Mantequilla"],["leche","Leche"]],
+    personalizar: {
+      modelo: "modelos/capas/pastel.glb",
+      variantes: "modelos/variantes/pastel_{bits}.usdz",
+      fijas: { 0: "modelos/postre_pastel.usdz" },
+      opciones: [{ id: "cereza", nombre: "Cereza", icono: "cereza", incluido: false, tipo: "posar" }],
+    },
   },
 ];
 

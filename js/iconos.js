@@ -233,6 +233,21 @@ const DIBUJOS = {
     <path d="M27 29.6v11L42 32V21z" fill="${Y}" stroke="${K}" stroke-width="2" stroke-linejoin="round"/>
     <path d="M14 20.6l8-4" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/>`,
 };
+// Extras de "En mi mesa" y marcas de los botones.
+DIBUJOS.cereza = `
+    <path d="M26 20c1-6 5-11 12-14" ${linea} stroke-width="2.4"/>
+    <path d="M36 7.4c3-2 6.4-1.6 8 .6-2.6 2.6-6 2.8-8-.6z" ${con(G)}/>
+    <circle cx="23" cy="30" r="13" ${con(ROJO)}/>
+    <path d="M14.6 27a9 9 0 0 1 5-5.6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" opacity=".8"/>
+    <path d="M21 19.6c1.6 1.4 4 1.4 5.6 0" ${linea} stroke-width="1.8"/>`;
+DIBUJOS.crotones = `
+    <rect x="5" y="20" width="19" height="19" rx="4" transform="rotate(-10 14.5 29.5)" ${con(PAN)}/>
+    <rect x="24" y="8" width="18" height="18" rx="4" transform="rotate(12 33 17)" ${con("#F0C27A")}/>
+    <rect x="27" y="28" width="14" height="14" rx="3.4" transform="rotate(-6 34 35)" ${con(PAN)}/>
+    <g fill="#C27A2C"><circle cx="12" cy="27" r="1.3"/><circle cx="17.6" cy="33" r="1.1"/><circle cx="31" cy="15" r="1.2"/><circle cx="36" cy="20" r="1"/><circle cx="33" cy="35" r="1"/></g>`;
+DIBUJOS.suma = `<path d="M24 11v26M11 24h26" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round"/>`;
+DIBUJOS.cerrar = `<path d="M13 13l22 22M35 13L13 35" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"/>`;
+
 // Los que se repiten con otro nombre.
 DIBUJOS.harina = DIBUJOS.gluten;
 DIBUJOS.leche = DIBUJOS.lacteos;

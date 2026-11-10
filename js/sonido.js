@@ -341,6 +341,9 @@ const EFECTOS = {
   billete: () => { soplo(0, 2600, 1500, 0.07, 0.22); madera(0.01, 0.16, 820); },
   nfc: () => { gota(1568, 0, 0.045, 0.15); gota(2093, 0.1, 0.045, 0.25); },
   publicar: () => [1046.5, 1318.5, 1568].forEach((f, i) => gota(f, i * 0.05, 0.05, 0.4)),
+  // En mi mesa: el ingrediente entra (sube de tono y "cae" en su lugar) o sale (un soplo que se va).
+  poner: () => { soplo(0, 900, 2600, 0.2, 0.06); burbuja(620, 0.06, 0.22); gota(1318.5, 0.16, 0.08, 0.4); madera(0.58, 0.2, 760); },
+  retirar: () => { soplo(0, 2800, 900, 0.24, 0.09); gota(988, 0.02, 0.07, 0.2); gota(740, 0.1, 0.07, 0.3); },
 };
 
 // Patrón de vibración de cada acción (milisegundos: vibra, pausa, vibra...). En Android es literal; en iPhone se
@@ -363,6 +366,8 @@ const HAPTICOS = {
   billete: [45],
   nfc: [40, 80, 40],
   publicar: [40, 50, 40, 50, 120],
+  poner: [35, 50, 60],
+  retirar: [60],
   logo: [120, 50, 280],
 };
 
