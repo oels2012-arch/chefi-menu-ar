@@ -1,7 +1,7 @@
 // Panel de prueba de sonido y vibración (se abre con ?prueba en la dirección). Sirve para saber qué funciona en
 // un celular en particular: cada botón prueba una sola cosa y el panel muestra el estado del audio.
 
-import { audioActivo, desbloquearAudio, sonar, efecto, golpeIOS, haptico, ES_IOS } from "./sonido.js?v=202611101409";
+import { audioActivo, desbloquearAudio, sonar, efecto, golpeIOS, haptico, ES_IOS } from "./sonido.js?v=202611101424";
 
 export function abrirPrueba() {
   const panel = document.createElement("div");

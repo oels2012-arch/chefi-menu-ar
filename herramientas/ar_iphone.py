@@ -195,7 +195,7 @@ def escena(stage):
 
 
 def interactivo(stage, opciones, estado, png_nombre):
-    """opciones: [{id, puesto, quitado, pieza: ruta Xform, centro, sube: (ruta Xform, metros) o None}]
+    """opciones: [{id, pieza: ruta Xform, centro, sube: (ruta Xform, matriz con el ingrediente puesto, matriz sin él) o None}]
     Las piezas ya existen como Xform sin transformación; aquí se les ponen posturas, placas y toques."""
     raiz = escena(stage) + "/Chefi"
     UsdGeom.Xform.Define(stage, raiz)
@@ -210,13 +210,18 @@ def interactivo(stage, opciones, estado, png_nombre):
         pieza = con_dos_posturas(stage, op["pieza"], Gf.Matrix4d(1.0), matriz(escala=MINI, centro=op["centro"]), puesto)
         mover = []
         if op.get("sube"):
-            ruta, metros = op["sube"]
+            ruta, con_el, sin_el = op["sube"]
             UsdGeom.Xformable(stage.GetPrimAtPath(ruta)).ClearXformOpOrder()
-            sube = con_dos_posturas(stage, ruta, Gf.Matrix4d(1.0), matriz(traslada=(0, -metros, 0)), puesto)
+            sube = con_dos_posturas(stage, ruta, con_el, sin_el, puesto)
             mover = [sube]
         # Las dos placas, en el mismo lugar: una dice que está puesto y la otra que no. La que no toca se guarda.
-        x = (k - (n - 1) / 2) * (PLACA_ANCHO + 0.012)
-        lugar = matriz(traslada=(x, PLACA_Y, PLACA_Z), gira_x=-PLACA_INCLINA)
+        # Hasta dos, en una fila; si son más, de dos en dos (la segunda fila queda más cerca de quien mira).
+        columnas = n if n <= 2 else 2
+        col, fila = k % columnas, k // columnas
+        x = (col - (columnas - 1) / 2) * (PLACA_ANCHO + 0.012)
+        filas = -(-n // columnas)
+        # En escalera: la fila de atrás queda más alta, para que la de adelante no la tape.
+        lugar = matriz(traslada=(x, PLACA_Y + (filas - 1 - fila) * (PLACA_ALTO * 0.86), PLACA_Z + fila * 0.03), gira_x=-PLACA_INCLINA)
         guardada = matriz(escala=MINI) * lugar
         placas = []
         for j, nombre in enumerate(("Puesto", "Quitado")):
@@ -254,14 +259,34 @@ def nombre_bits(estado):
 
 
 # ---------- Hamburguesa: el modelo escaneado partido en piezas rígidas ----------
+TEXTOS_HAMBURGUESA = {
+    "lechuga": ("Con lechuga", "Sin lechuga"), "jitomate": ("Con jitomate", "Agregar jitomate"),
+    "carne": ("Doble carne", "Carne sencilla"), "queso": ("Con queso extra", "Agregar queso"),
+}
+
+
+def cilindro(cx, cz, r, y0, y1, seg=40):
+    ang = np.linspace(0, 2 * np.pi, seg, endpoint=False)
+    aro = np.stack([cx + r * np.cos(ang), np.zeros(seg), cz + r * np.sin(ang)], axis=1)
+    P = np.concatenate([aro + [0, y0, 0], aro + [0, y1, 0], [[cx, y1, cz]]])
+    k = np.arange(seg); t = (k + 1) % seg
+    F = np.concatenate([np.stack([k, k + seg, t], axis=1), np.stack([t, k + seg, t + seg], axis=1), np.stack([k + seg, np.full(seg, 2 * seg), t + seg], axis=1)])
+    return P, F
+
+
 def hamburguesa(destino_dir):
-    bandas = lechuga.ASENTAR["bandas"]
-    textos = [("Con lechuga", "Sin lechuga"), ("Doble carne", "Carne sencilla")]
-    png = dibujar_placas(textos)
-    for estado in combinaciones(2):
+    """Cada paso (ver lechuga.ASENTAR["pasos"]) abre un nivel: un Xform que contiene todo lo que queda encima y
+    que baja (si se quita un ingrediente escaneado) o sube (si se pone uno dibujado). Los niveles van anidados."""
+    pasos = lechuga.ASENTAR["pasos"]
+    cx, cz = lechuga.ASENTAR["centro"]
+    png = dibujar_placas([TEXTOS_HAMBURGUESA[p["id"]] for p in pasos])
+    paleta = capas.paleta_png()
+    for estado in combinaciones(len(pasos)):
+        dibujadas = lechuga.piezas_dibujadas()
         with tempfile.TemporaryDirectory() as tmp:
             zipfile.ZipFile(os.path.join(AQUI, "modelos/fuerte_hamburguesa.usdz")).extractall(tmp)
             open(os.path.join(tmp, "placas.png"), "wb").write(png)
+            open(os.path.join(tmp, "paleta.png"), "wb").write(paleta)
             stage = Usd.Stage.Open(os.path.join(tmp, "model.usdc"))
             original = next(p for p in stage.Traverse() if p.IsA(UsdGeom.Mesh) and UsdGeom.PrimvarsAPI(p).GetPrimvar("st").HasValue())
             m = UsdGeom.Mesh(original)
@@ -272,48 +297,63 @@ def hamburguesa(destino_dir):
             material = UsdShade.MaterialBindingAPI(original).ComputeBoundMaterial()[0]
             archivo = next(str(a.Get().path) for s in stage.Traverse() for a in s.GetAttributes() if a.GetName() == "inputs:file" and "diffuse" in s.GetName())
             partes = lechuga.repartir(P, F, UV, Image.open(os.path.join(tmp, archivo)))
-
-            # A qué pieza va cada cara: las de un ingrediente con él; del resto, según su altura dentro de la hamburguesa.
             centro_cara = P[F].mean(axis=1)
             zona = lechuga.es_hamburguesa(centro_cara) > 0.5
             y = centro_cara[:, 1]
-            suelto = partes["lechuga"] | partes["carne"]
-            grupos = {
-                "Lechuga": partes["lechuga"],
-                "Carne": partes["carne"] | (~suelto & zona & (y >= bandas["carne"][0]) & (y < bandas["carne"][1])),
-                "Arriba": ~suelto & zona & (y >= bandas["carne"][1]),
-            }
-            grupos["Medio"] = ~suelto & zona & (y >= bandas["lechuga"][0]) & (y < bandas["carne"][0])
-            grupos["Base"] = ~np.logical_or.reduce(list(grupos.values()))
 
-            # Árbol: lo de arriba de la lechuga cuelga de SobreLechuga; lo de arriba de la carne, de SobreCarne.
             raiz = escena(stage) + "/Hamburguesa"
             UsdGeom.Xform.Define(stage, raiz)
-            rutas = {
-                "Base": f"{raiz}/Base", "Lechuga": f"{raiz}/Lechuga", "Medio": f"{raiz}/SobreLechuga/Medio",
-                "Carne": f"{raiz}/SobreLechuga/Carne", "Arriba": f"{raiz}/SobreLechuga/SobreCarne/Arriba",
-            }
-            for ruta in (f"{raiz}/Lechuga", f"{raiz}/SobreLechuga", f"{raiz}/SobreLechuga/Carne", f"{raiz}/SobreLechuga/SobreCarne"):
-                UsdGeom.Xform.Define(stage, ruta)
-            for nombre, caras in grupos.items():
-                if not caras.any():
-                    continue
-                p, f, st = lechuga.compactar(P, F[caras], UV)
-                ruta = rutas[nombre] + ("/Malla" if nombre in ("Lechuga", "Carne") else "")
-                malla(stage, ruta, p, f, st, material)
-            # Relleno oscuro por dentro: tapa las rendijas entre piezas.
-            _, pr, _, _, fr, _ = lechuga.relleno()
-            pr = pr.copy(); pr[:, 1] = np.where(pr[:, 1] > 0.03, bandas["lechuga"][0] + 0.004, pr[:, 1])
-            malla(stage, f"{raiz}/Relleno", pr, fr, None, material_color(stage, f"{raiz}/MatRelleno", (0.07, 0.035, 0.02), 0.9), doble=True)
+            oscuro = material_color(stage, raiz + "/MatRelleno", (0.07, 0.035, 0.02), 0.9)
+            tomadas = np.zeros(len(F), bool)
+            opciones, nivel, piso = [], raiz, 0.0  # piso: desde qué altura las caras fijas son de este nivel
+            niveles = [(raiz, 0.0)]
+            for paso in pasos:
+                ident = paso["id"]
+                pieza = f"{nivel}/{ident.capitalize()}"
+                UsdGeom.Xform.Define(stage, pieza)
+                arriba = f"{nivel}/Sobre{ident.capitalize()}"
+                UsdGeom.Xform.Define(stage, arriba)
+                if "quita" in paso:
+                    y0, y1 = paso["quita"]
+                    # Con la lechuga solo se van sus hojas; con la carne, todo lo que vive a su altura.
+                    caras = partes[ident] if ident == "lechuga" else (partes[ident] | (zona & (y >= y0) & (y < y1) & ~tomadas))
+                    tomadas |= caras
+                    p, f, st = lechuga.compactar(P, F[caras], UV)
+                    malla(stage, pieza + "/Malla", p, f, st, material, doble=True)
+                    centro = (cx, (y0 + y1) / 2, cz)
+                    sube = (arriba, Gf.Matrix4d(1.0), matriz(traslada=(0, -(y1 - y0), 0)))
+                    piso = y0
+                else:
+                    capas.agregar_usd(stage, pieza, [("pieza", dibujadas[ident], [0, 0, 0], None)], "paleta.png")
+                    centro = (cx, paso["pone"] + paso["alto"] / 2, cz)
+                    sube = (arriba, matriz(traslada=(0, paso["alto"], 0)), Gf.Matrix4d(1.0))
+                    piso = paso["pone"]
+                opciones.append({"id": ident, "pieza": pieza, "centro": centro, "sube": sube})
+                nivel = arriba
+                niveles.append((nivel, piso))
+            # Las caras fijas van al nivel más alto que empieza por debajo de ellas (las papas, siempre a la base).
+            libres = ~tomadas
+            for k, (ruta, desde) in enumerate(niveles):
+                hasta = min([d for _, d in niveles[k + 1:] if d > desde] or [np.inf])
+                mas_altos = [d for _, d in niveles[k + 1:]]
+                if k and desde in mas_altos:  # otro nivel más alto empieza a la misma altura: se las queda él
+                    caras = np.zeros(len(F), bool)
+                elif k == 0:
+                    caras = libres & (~zona | (y < hasta))
+                else:
+                    caras = libres & zona & (y >= desde) & (y < hasta)
+                if caras.any():
+                    p, f, st = lechuga.compactar(P, F[caras], UV)
+                    malla(stage, f"{ruta}/Fijo", p, f, st, material, doble=True)
+                # Un tramo de relleno oscuro por nivel: nunca se ve el plato ni la mesa a través de la hamburguesa.
+                # Delgado y bajo, para que no se asome por donde la hamburguesa se angosta.
+                y0 = 0.02 if k == 0 else desde - 0.007
+                y1 = (hasta if np.isfinite(hasta) else desde) + 0.002
+                if k == 0 or desde not in mas_altos:
+                    pr, fr = cilindro(cx, cz, 0.042, y0, y1)
+                    malla(stage, f"{ruta}/Relleno", pr, fr, None, oscuro, doble=True)
             stage.RemovePrim(original.GetPath())
-
-            cx, cz = lechuga.ASENTAR["centro"]
-            interactivo(stage, [
-                {"id": "lechuga", "pieza": f"{raiz}/Lechuga", "centro": (cx, np.mean(bandas["lechuga"]), cz),
-                 "sube": (f"{raiz}/SobreLechuga", bandas["lechuga"][1] - bandas["lechuga"][0])},
-                {"id": "carne", "pieza": f"{raiz}/SobreLechuga/Carne", "centro": (cx, np.mean(bandas["carne"]), cz),
-                 "sube": (f"{raiz}/SobreLechuga/SobreCarne", bandas["carne"][1] - bandas["carne"][0])},
-            ], estado, "placas.png")
+            interactivo(stage, opciones, estado, "placas.png")
             empacar(tmp, stage, os.path.join(destino_dir, f"hamburguesa_{nombre_bits(estado)}.usdz"))
 
 

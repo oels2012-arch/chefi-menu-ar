@@ -12,13 +12,13 @@ Salidas:
 Uso, desde menu-web:  python herramientas/lechuga.py ../modelos3d/final
 Requiere: numpy, pillow, trimesh, usd-core y npx (gltf-transform para comprimir con Draco).
 """
-import io, json, os, struct, subprocess, sys, tempfile, zipfile
+import json, os, struct, subprocess, sys, tempfile
 
 import numpy as np
 import trimesh
 from PIL import Image
-from pxr import Sdf, Usd, UsdGeom, UsdUtils, Vt
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 ORIGEN = sys.argv[1] if len(sys.argv) > 1 else "../modelos3d/final"
 AQUI = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -28,10 +28,18 @@ ASENTAR = {
     "radio": [0.058, 0.066],   # atrás, lo que pasa de este radio ya son papas y no se mueve
     "frente": [-0.012, 0.0],   # de esta z hacia el frente todo es hamburguesa (tocino y aros que sobresalen)
     "alto": [0.080, 0.090],    # y de esta altura hacia arriba también (las papas no llegan tan alto)
-    # Alturas entre las que vive cada ingrediente que se puede quitar. Al quitarlo, lo de arriba baja el alto
-    # de su banda y el hueco se cierra. El orden es el de las opciones en datos.js (y el de los bits del USDZ).
-    "bandas": {"lechuga": [0.029, 0.042], "carne": [0.042, 0.058]},
+    # Los ingredientes que se pueden cambiar, de abajo hacia arriba (mismo orden que las opciones de datos.js y que
+    # los bits del USDZ):
+    #  - "quita": vive entre esas dos alturas en el modelo escaneado; al quitarlo, lo de arriba baja ese alto.
+    #  - "pone": pieza dibujada que entra a esa altura; al ponerla, lo de arriba sube su grosor ("alto").
+    "pasos": [
+        {"id": "lechuga", "quita": [0.029, 0.042]},
+        {"id": "jitomate", "pone": 0.042, "alto": 0.0072},
+        {"id": "carne", "quita": [0.042, 0.058]},
+        {"id": "queso", "pone": 0.058, "alto": 0.0034},
+    ],
 }
+ASENTAR["bandas"] = {p["id"]: p["quita"] for p in ASENTAR["pasos"] if "quita" in p}
 
 
 def escalon(a, b, x):
@@ -50,13 +58,27 @@ def es_hamburguesa(P):
     return np.maximum.reduce([1 - suave(*a["radio"], r), suave(*a["frente"], P[:, 2]), suave(*a["alto"], P[:, 1])])
 
 
-def asentar(P, quitados):
-    """Baja lo que está arriba de cada ingrediente quitado. P en metros, en coordenadas del platillo."""
-    Q = P.copy()
-    for nombre in quitados:
-        y0, y1 = ASENTAR["bandas"][nombre]
-        Q[:, 1] -= (y1 - y0) * es_hamburguesa(P) * escalon(y0, y1, P[:, 1])
-    return Q
+def piezas_dibujadas():
+    """Las piezas que se ponen (jitomate, queso extra), ya colocadas en su lugar: {id: [Malla de capas.py]}."""
+    import copy
+    import capas
+    cx, cz = ASENTAR["centro"]
+    hechas = {}
+    for paso in ASENTAR["pasos"]:
+        if "pone" not in paso:
+            continue
+        mallas, _ = getattr(capas, paso["id"])()
+        if paso["id"] == "jitomate":
+            # Cuatro rebanadas en cruz que llegan al borde, para que se vea por todos lados.
+            otras = [copy.deepcopy(m).girar(capas.rot_y(np.pi / 2)).mover([0, 0.0005, 0]) for m in mallas]
+            mallas = mallas + otras
+            for m in mallas:
+                m.P = m.P * [1.13, 0.86, 1.13]
+        if paso["id"] == "queso":
+            for m in mallas:
+                m.P = m.P * [0.93, 1, 0.93]
+        hechas[paso["id"]] = [m.mover([cx, paso["pone"], cz]) for m in mallas]
+    return hechas
 
 
 def repartir(P, F, UV, textura):
@@ -99,7 +121,8 @@ def leer_glb(ruta):
 
 
 def escribir_glb(ruta, nodos, imagenes, plato_color):
-    """nodos: [(nombre, P, N, UV o None, F, material)]. imagenes: [color, normal, orm] en JPEG. UV con la v desde arriba (glTF)."""
+    """nodos: [(nombre, P, N, UV o None, F, material)]. imagenes: [color, normal, orm, paleta]. UV con la v desde arriba (glTF).
+    Materiales: 0 plato, 1 comida escaneada, 2 relleno, 3 piezas dibujadas (paleta de capas.py)."""
     bin_, vistas, accesores, mallas, gnodos = bytearray(), [], [], [], []
 
     def vista(datos, destino=None):
@@ -128,13 +151,14 @@ def escribir_glb(ruta, nodos, imagenes, plato_color):
         "asset": {"version": "2.0", "generator": "chefi lechuga.py"},
         "scene": 0, "scenes": [{"name": "platillo", "nodes": list(range(len(gnodos)))}],
         "nodes": gnodos, "meshes": mallas,
-        "images": [{"bufferView": vista(img), "mimeType": "image/jpeg"} for img in imagenes],
-        "samplers": [{"magFilter": 9729, "minFilter": 9987}],
-        "textures": [{"source": k, "sampler": 0} for k in range(3)],
+        "images": [{"bufferView": vista(img), "mimeType": "image/png" if img[:4] == b"\x89PNG" else "image/jpeg"} for img in imagenes],
+        "samplers": [{"magFilter": 9729, "minFilter": 9987}, {"magFilter": 9729, "minFilter": 9729, "wrapS": 33071, "wrapT": 33071}],
+        "textures": [{"source": k, "sampler": 0} for k in range(3)] + [{"source": 3, "sampler": 1}],
         "materials": [
             {"name": "plato", "pbrMetallicRoughness": {"baseColorFactor": plato_color, "roughnessFactor": 0.25, "metallicFactor": 0}},
             {"name": "comida", "pbrMetallicRoughness": {"baseColorTexture": {"index": 0}, "metallicRoughnessTexture": {"index": 2}}, "normalTexture": {"index": 1}},
             {"name": "relleno", "pbrMetallicRoughness": {"baseColorFactor": [0.07, 0.035, 0.02, 1], "roughnessFactor": 0.9, "metallicFactor": 0}},
+            {"name": "dibujado", "pbrMetallicRoughness": {"baseColorTexture": {"index": 3}, "roughnessFactor": 0.4, "metallicFactor": 0}},
         ],
         "accessors": accesores, "bufferViews": vistas,
     }
@@ -191,46 +215,15 @@ def hacer_glb(destino):
     for nombre, caras in [("cuerpo", F[resto])] + [(nombre, F[m]) for nombre, m in partes.items()]:
         p, f, n, uv = compactar(P, caras, N, uv_gltf)
         nodos.append((nombre, p, n, uv, f, 1))
+    import capas
+    for nombre, mallas in piezas_dibujadas().items():
+        m = capas.unir(mallas)
+        nodos.append((nombre, m.P, m.normales(), m.UV, m.F, 3))
+    imagenes.append(capas.paleta_png())
     with tempfile.TemporaryDirectory() as tmp:
         crudo = os.path.join(tmp, "crudo.glb")
         escribir_glb(crudo, nodos, imagenes, plato_color)
         subprocess.run(["npx", "-y", "@gltf-transform/cli@4", "draco", crudo, destino], check=True, stdout=subprocess.DEVNULL)
-    print(destino, os.path.getsize(destino) // 1024, "KB")
-
-
-# ---------- USDZ ----------
-def hacer_usdz(base, destino, quitados):
-    """Copia el USDZ de siempre y le quita esos ingredientes a la malla de la comida."""
-    with tempfile.TemporaryDirectory() as tmp:
-        zipfile.ZipFile(base).extractall(tmp)
-        stage = Usd.Stage.Open(os.path.join(tmp, "model.usdc"))
-        for prim in stage.Traverse():
-            if not prim.IsA(UsdGeom.Mesh):
-                continue
-            st = UsdGeom.PrimvarsAPI(prim).GetPrimvar("st")
-            if not st or not st.HasValue():
-                continue  # el plato no tiene textura
-            malla = UsdGeom.Mesh(prim)
-            M = np.array(UsdGeom.Xformable(prim).ComputeLocalToWorldTransform(Usd.TimeCode.Default()))  # vector fila
-            local = np.array(malla.GetPointsAttr().Get(), dtype=float)
-            P = local @ M[:3, :3] + M[3, :3]
-            F = np.array(malla.GetFaceVertexIndicesAttr().Get()).reshape(-1, 3)
-            UV = np.array(st.Get(), dtype=float)
-            archivo = next(str(a.Get().path) for s in stage.Traverse() for a in s.GetAttributes() if a.GetName() == "inputs:file" and "diffuse" in s.GetName())
-            partes = repartir(P, F, UV, Image.open(os.path.join(tmp, archivo)))
-            fuera = np.logical_or.reduce([partes[nombre] for nombre in quitados])
-            nuevo = (asentar(P, quitados) - M[3, :3]) @ np.linalg.inv(M[:3, :3])
-            malla.GetPointsAttr().Set(Vt.Vec3fArray.FromNumpy(nuevo.astype(np.float32)))
-            F = F[~fuera]
-            malla.GetFaceVertexIndicesAttr().Set(Vt.IntArray.FromNumpy(F.reshape(-1).astype(np.int32)))
-            malla.GetFaceVertexCountsAttr().Set(Vt.IntArray.FromNumpy(np.full(len(F), 3, dtype=np.int32)))
-            normales = malla.GetNormalsAttr()
-            if normales.HasValue() and malla.GetNormalsInterpolation() != "vertex":
-                normales.Clear()  # venían por cara: ya no corresponden
-        os.rename(os.path.join(tmp, "model.usdc"), os.path.join(tmp, "previo.usdc"))
-        stage.GetRootLayer().Export(os.path.join(tmp, "model.usdc"))  # exportar compacta el archivo
-        os.remove(os.path.join(tmp, "previo.usdc"))
-        UsdUtils.CreateNewARKitUsdzPackage(Sdf.AssetPath(os.path.join(tmp, "model.usdc")), destino)
     print(destino, os.path.getsize(destino) // 1024, "KB")
 
 

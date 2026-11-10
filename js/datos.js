@@ -36,10 +36,22 @@ export const PLATILLOS = [
       variantes: "modelos/variantes/hamburguesa_{bits}.usdz",
       opciones: [
         { id: "lechuga", nombre: "Lechuga", icono: "lechuga", incluido: true, tipo: "anillo" },
+        { id: "jitomate", nombre: "Jitomate", icono: "jitomate", incluido: false, tipo: "capa" },
         { id: "carne", nombre: "Doble carne", sin: "Carne sencilla", icono: "carne", incluido: true, tipo: "anillo" },
+        { id: "queso", nombre: "Queso extra", icono: "queso", incluido: false, tipo: "capa" },
       ],
-      // Al quitar un ingrediente, lo de arriba baja el alto de su banda. Mismas medidas (metros) que herramientas/lechuga.py.
-      asentar: { centro: [0.006, 0.04], radio: [0.058, 0.066], frente: [-0.012, 0], alto: [0.08, 0.09], bandas: { lechuga: [0.029, 0.042], carne: [0.042, 0.058] } },
+      // Cómo se acomoda la hamburguesa escaneada al cambiar un ingrediente. Mismas medidas (metros) que
+      // herramientas/lechuga.py. "quita": al quitarlo, lo de arriba baja el alto de su banda. "pone": pieza
+      // dibujada que entra a esa altura y levanta lo de arriba su grosor.
+      asentar: {
+        centro: [0.006, 0.04], radio: [0.058, 0.066], frente: [-0.012, 0], alto: [0.08, 0.09],
+        pasos: [
+          { id: "lechuga", quita: [0.029, 0.042] },
+          { id: "jitomate", pone: 0.042, alto: 0.0072 },
+          { id: "carne", quita: [0.042, 0.058] },
+          { id: "queso", pone: 0.058, alto: 0.0034 },
+        ],
+      },
     },
   },
   {
