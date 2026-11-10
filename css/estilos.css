@@ -525,6 +525,12 @@ button, .tarjeta, .metodos label { position: relative; overflow: hidden; }
 .arma-chip.cambia { animation: rebote .45s var(--resorte); }
 .arma-chip.cambia .arma-icono { animation: arma-salta .5s var(--resorte); }
 @keyframes arma-salta { 35% { transform: translateY(-6px) rotate(-10deg) scale(1.1); } }
+/* Con dos o más ingredientes: más compactos, para tapar menos el platillo */
+.arma.varios { gap: 6px; right: 8px; }
+.arma.varios .arma-chip { min-height: 36px; padding: 3px 4px 3px 3px; gap: 5px; font-size: .72rem; }
+.arma.varios .arma-icono { width: 26px; height: 26px; }
+.arma.varios .arma-marca { width: 20px; height: 20px; }
+.arma.varios .arma-marca svg { width: 11px; height: 11px; }
 /* Con la cámara abierta (Android): abajo y al centro, más grandes */
 model-viewer[ar-status="session-started"] .arma { left: 0; right: 0; bottom: calc(28px + env(safe-area-inset-bottom)); flex-direction: row; justify-content: center; }
 model-viewer[ar-status="session-started"] .arma-chip { min-height: 52px; padding-right: 10px; font-size: .92rem; }

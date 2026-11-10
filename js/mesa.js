@@ -1,8 +1,8 @@
 // Arma tu platillo: botones para quitar o poner ingredientes sobre el modelo 3D de siempre (el visor del platillo).
 // Cada cambio se ve en el modelo al momento, con animación de entrada y de salida, y "Ver en mi mesa" abre la
 // realidad aumentada con el platillo tal como quedó:
-// - iPhone: AR Quick Look con el USDZ de esa combinación (la cámara de Apple no admite botones propios,
-//   por eso los ingredientes se eligen antes de abrirla).
+// - iPhone: AR Quick Look con el USDZ de esa combinación. La cámara de Apple no admite botones de la página, pero
+//   el archivo trae placas 3D junto al plato que se tocan para quitar o poner el ingrediente (herramientas/ar_iphone.py).
 // - Android: WebXR; los mismos botones siguen visibles dentro de la cámara y el modelo cambia en vivo.
 //
 // Los modelos de modelos/capas/ son los platillos escaneados con cada ingrediente en su propio nodo:
@@ -10,8 +10,8 @@
 //   lo de arriba se asienta (personalizar.asentar).
 // - "lluvia" (parmesano, crotones) y "posar" (cereza): extras agregados con herramientas/capas.py.
 
-import { icono } from "./iconos.js?v=202611101318";
-import { efecto, vibrar } from "./sonido.js?v=202611101318";
+import { icono } from "./iconos.js?v=202611101409";
+import { efecto, vibrar } from "./sonido.js?v=202611101409";
 
 const ES_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && "ontouchend" in document);
 
@@ -27,14 +27,14 @@ export function eleccionInicial(platillo) {
 export function textoEleccion(platillo, eleccion) {
   return (platillo.personalizar?.opciones ?? [])
     .filter((o) => Boolean(eleccion?.[o.id] ?? o.incluido) !== Boolean(o.incluido))
-    .map((o) => `${o.incluido ? "Sin" : "Con"} ${o.nombre.toLowerCase()}`)
+    .map((o) => (o.incluido ? o.sin ?? `Sin ${o.nombre.toLowerCase()}` : `Con ${o.nombre.toLowerCase()}`))
     .join(" · ");
 }
 
 function urlVariante(platillo, eleccion) {
   const per = platillo.personalizar;
   const bits = per.opciones.map((o) => (eleccion[o.id] ? "1" : "0")).join("");
-  return per.fijas?.[bits] ?? per.variantes.replace("{bits}", bits);
+  return per.variantes.replace("{bits}", bits);
 }
 
 // Banner de AR Quick Look (iPhone): nombre, lo que se cambió, precio y "Agregar al pedido".
@@ -112,7 +112,7 @@ function aplicar(p) {
   const cos = Math.cos(e.ry), sin = Math.sin(e.ry);
   obj.position.set(
     apoyo.x + (vx * cos + vz * sin) * e.s + e.dx,
-    apoyo.y + vy * e.s * e.sy + e.dy,
+    apoyo.y + vy * e.s * e.sy + e.dy - (p.baja ?? 0),
     apoyo.z + (-vx * sin + vz * cos) * e.s + e.dz,
   );
   obj.rotation.y = e.ry;
@@ -189,7 +189,7 @@ function prepararEscena() {
       todas.push(...piezas[opcion.id]);
     }
     const regla = platillo.personalizar.asentar;
-    const cuerpo = regla ? crearCuerpo(nombres.find((o) => o.name === "cuerpo"), regla) : null;
+    const cuerpo = regla ? crearCuerpo(nombres.find((o) => o.name === "cuerpo"), regla, piezas, nombres.find((o) => o.name === "relleno")) : null;
     if (cuerpo) todas.push(cuerpo);
     cache = { llave: nombres[0], id: platillo.id, piezas, todas, cuerpo };
   }
@@ -205,7 +205,7 @@ function prepararEscena() {
   }
   if (actual.cuerpo) {
     parar(actual.cuerpo);
-    actual.cuerpo.e.m = eleccion[platillo.personalizar.asentar.con] ? 0 : 1;
+    for (const id of Object.keys(actual.cuerpo.e)) actual.cuerpo.e[id] = eleccion[id] ? 0 : 1;
     actual.cuerpo.aplicar(actual.cuerpo);
   }
   escena.queueShadowRender?.();
@@ -214,41 +214,63 @@ function prepararEscena() {
 }
 
 // ---------- Poner y quitar ----------
-// La hamburguesa escaneada: todo lo que está arriba de la lechuga baja (m = 1) o regresa a su lugar (m = 0).
+// La hamburguesa escaneada: lo que está arriba de un ingrediente quitado baja (su peso = 1) o regresa a su lugar (0).
 // Misma regla que herramientas/lechuga.py, que hace la versión sin lechuga para la cámara del iPhone.
-function crearCuerpo(obj, regla) {
+function crearCuerpo(obj, regla, piezas, relleno) {
   let malla = null;
   obj?.traverse((o) => { if (!malla && o.isMesh) malla = o; });
   const pos = malla?.geometry?.getAttribute("position");
   if (!pos || pos.isInterleavedBufferAttribute || !(pos.array instanceof Float32Array)) return null;
   const escalon = (a, b, x) => Math.min(1, Math.max(0, (x - a) / (b - a)));
   const suave = (a, b, x) => { const t = escalon(a, b, x); return t * t * (3 - 2 * t); };
-  const y0 = new Float32Array(pos.count), baja = new Float32Array(pos.count);
+  const bandas = Object.entries(regla.bandas);
+  const y0 = new Float32Array(pos.count);
+  // El relleno oscuro de adentro se encoge desde arriba lo mismo que baja la hamburguesa, para no asomarse.
+  const cajaRelleno = relleno ? medir(relleno) : null;
+  const baja = bandas.map(() => new Float32Array(pos.count)); // cuánto baja cada vértice al quitar cada ingrediente
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
     const r = Math.hypot(x - regla.centro[0], z - regla.centro[1]);
-    const esHamburguesa = Math.max(1 - suave(regla.radio[0], regla.radio[1], r), suave(regla.frente[0], regla.frente[1], z));
+    const esHamburguesa = Math.max(1 - suave(regla.radio[0], regla.radio[1], r), suave(regla.frente[0], regla.frente[1], z), suave(regla.alto[0], regla.alto[1], y));
     y0[i] = y;
-    baja[i] = regla.baja * esHamburguesa * escalon(regla.banda[0], regla.banda[1], y);
+    bandas.forEach(([, [a, b]], k) => { baja[k][i] = (b - a) * esHamburguesa * escalon(a, b, y); });
   }
   return {
-    e: { m: 0 }, cola: [],
+    e: Object.fromEntries(bandas.map(([id]) => [id, 0])), cola: [],
     aplicar(p) {
-      for (let i = 0; i < pos.count; i++) pos.setY(i, y0[i] - baja[i] * p.e.m);
+      const pesos = bandas.map(([id]) => p.e[id]);
+      for (let i = 0; i < pos.count; i++) {
+        let y = y0[i];
+        for (let k = 0; k < pesos.length; k++) y -= baja[k][i] * pesos[k];
+        pos.setY(i, y);
+      }
       pos.needsUpdate = true;
+      if (cajaRelleno) {
+        const [abajo, arriba] = [cajaRelleno.min[1], cajaRelleno.max[1]];
+        const total = bandas.reduce((suma, [, [a, b]], k) => suma + (b - a) * Math.max(0, pesos[k]), 0);
+        const sy = Math.max(0.05, (arriba - total - abajo) / (arriba - abajo));
+        relleno.scale.y = sy;
+        relleno.position.y = abajo * (1 - sy);
+      }
+      // Los ingredientes sueltos que están más arriba bajan junto con el cuerpo.
+      bandas.forEach(([id, [a]], k) => {
+        let baja = 0;
+        bandas.forEach(([, [c, d]], j) => { if (d <= a) baja += (d - c) * pesos[j]; });
+        for (const pieza of piezas[id] ?? []) { pieza.baja = baja; aplicar(pieza); }
+      });
     },
   };
 }
 
 // Un ingrediente que rodea al platillo (la lechuga): se abre girando y se desvanece; al volver, se cierra con rebote.
 function animarAnillo(id, poner) {
-  const cuerpo = actual.cuerpo;
-  if (cuerpo) parar(cuerpo);
+  const cuerpo = actual.cuerpo?.e[id] !== undefined ? actual.cuerpo : null;
+  if (cuerpo) cuerpo.cola = cuerpo.cola.filter((m) => m.prop !== id); // solo lo de este ingrediente; el otro puede seguir moviéndose
   for (const p of actual.piezas[id]) {
     parar(p);
     if (poner) {
       // La hamburguesa se levanta un poco para abrir espacio...
-      if (cuerpo) mover(cuerpo, { m: -0.45 }, 240, "suave");
+      if (cuerpo) mover(cuerpo, { [id]: -0.4 }, 240, "suave");
       // ...la lechuga entra girando y se ajusta...
       Object.assign(p.e, { s: 1.32, ry: -0.9, dy: 0.012, op: 0, sy: 1 });
       p.obj.visible = true;
@@ -257,19 +279,19 @@ function animarAnillo(id, poner) {
       mover(p, { s: 1, ry: 0 }, 480, "rebote", 60);
       mover(p, { dy: 0 }, 380, "suave", 60);
       // ...y todo cae encima con un rebote.
-      if (cuerpo) mover(cuerpo, { m: 0 }, 380, "bote", 400);
+      if (cuerpo) mover(cuerpo, { [id]: 0 }, 380, "bote", 400);
       mover(p, { sy: 0.8 }, 90, "suave", 620);
       mover(p, { sy: 1 }, 340, "rebote", 710);
       setTimeout(() => vibrar([55]), 640); // el "pum" al asentarse (dentro de 1 s del toque: el iPhone sí vibra)
     } else {
       const ficha = (p.ficha = (p.ficha ?? 0) + 1);
-      if (cuerpo) mover(cuerpo, { m: -0.3 }, 180, "suave");
+      if (cuerpo) mover(cuerpo, { [id]: -0.25 }, 180, "suave");
       mover(p, { s: 0.95 }, 120, "suave");
       mover(p, { s: 1.34, ry: 0.9, dy: 0.01 }, 400, "suave", 120);
       mover(p, { op: 0 }, 240, "suave", 260).then(() => {
         if (p.ficha === ficha && !actual?.eleccion[id]) p.obj.visible = false;
       });
-      if (cuerpo) mover(cuerpo, { m: 1 }, 400, "bote", 300);
+      if (cuerpo) mover(cuerpo, { [id]: 1 }, 400, "bote", 300);
       setTimeout(() => vibrar([40]), 560);
     }
   }
@@ -346,7 +368,7 @@ function pintarOpciones() {
     lista.innerHTML = platillo.personalizar.opciones.map((o) => `
       <button class="arma-chip" data-arma="${o.id}">
         <span class="arma-icono">${icono(o.icono)}</span>
-        <span class="arma-nombre"><small></small> ${o.nombre.toLowerCase()}</span>
+        <span class="arma-nombre"></span>
         <span class="arma-marca">${icono("check")}${icono("suma")}</span>
       </button>`).join("");
   }
@@ -361,7 +383,8 @@ function pintarOpciones() {
     chip.classList.toggle("activo", puesto);
     chip.setAttribute("aria-pressed", puesto);
     const opcion = platillo.personalizar.opciones.find((o) => o.id === chip.dataset.arma);
-    chip.querySelector("small").textContent = puesto ? "Con" : opcion.incluido ? "Sin" : "Agregar";
+    const nombre = opcion.nombre.toLowerCase();
+    chip.querySelector(".arma-nombre").textContent = puesto ? (opcion.sin ? opcion.nombre : `Con ${nombre}`) : opcion.incluido ? opcion.sin ?? `Sin ${nombre}` : `Agregar ${nombre}`;
   }
 }
 
@@ -395,6 +418,7 @@ export function personalizar(visor, platillo, eleccion, { alCambiar } = {}) {
   }
   lista.replaceChildren();
   lista.hidden = !platillo.personalizar;
+  lista.classList.toggle("varios", (platillo.personalizar?.opciones.length ?? 0) > 1);
   if (!platillo.personalizar) { actual = null; return; }
   actual = { platillo, visor, lista, alCambiar, eleccion: { ...eleccionInicial(platillo), ...eleccion }, piezas: null, todas: [], cuerpo: null };
   pintarOpciones();

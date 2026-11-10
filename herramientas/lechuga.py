@@ -6,7 +6,7 @@ Al quitar la lechuga, la parte de arriba de la hamburguesa "se asienta" sobre el
 Salidas:
 - modelos/capas/hamburguesa.glb          nodos: plato, cuerpo (todo menos la lechuga) y lechuga. El visor (js/mesa.js)
                                           esconde la lechuga y asienta el cuerpo con la misma regla que `asentar()`.
-- modelos/variantes/hamburguesa_0.usdz   la misma hamburguesa ya sin lechuga, para AR Quick Look (iPhone).
+- modelos/variantes/hamburguesa_<bits>.usdz  una por combinación (bits: lechuga, carne), para AR Quick Look (iPhone).
   (con lechuga se usa el USDZ de siempre: modelos/fuerte_hamburguesa.usdz)
 
 Uso, desde menu-web:  python herramientas/lechuga.py ../modelos3d/final
@@ -27,8 +27,10 @@ ASENTAR = {
     "centro": [0.006, 0.040],  # eje de la hamburguesa (x, z); las papas quedan atrás (z negativa)
     "radio": [0.058, 0.066],   # atrás, lo que pasa de este radio ya son papas y no se mueve
     "frente": [-0.012, 0.0],   # de esta z hacia el frente todo es hamburguesa (tocino y aros que sobresalen)
-    "banda": [0.029, 0.042],   # alturas entre las que vive la lechuga
-    "baja": 0.013,             # cuánto baja lo de arriba al quitarla (el alto de la banda: el hueco se cierra)
+    "alto": [0.080, 0.090],    # y de esta altura hacia arriba también (las papas no llegan tan alto)
+    # Alturas entre las que vive cada ingrediente que se puede quitar. Al quitarlo, lo de arriba baja el alto
+    # de su banda y el hueco se cierra. El orden es el de las opciones en datos.js (y el de los bits del USDZ).
+    "bandas": {"lechuga": [0.029, 0.042], "carne": [0.042, 0.058]},
 }
 
 
@@ -45,33 +47,40 @@ def es_hamburguesa(P):
     """1 en la hamburguesa, 0 en las papas."""
     a = ASENTAR
     r = np.hypot(P[:, 0] - a["centro"][0], P[:, 2] - a["centro"][1])
-    return np.maximum(1 - suave(*a["radio"], r), suave(*a["frente"], P[:, 2]))
+    return np.maximum.reduce([1 - suave(*a["radio"], r), suave(*a["frente"], P[:, 2]), suave(*a["alto"], P[:, 1])])
 
 
-def asentar(P, cuanto=1.0):
-    """Baja la parte de arriba de la hamburguesa. P en metros, en coordenadas del platillo."""
+def asentar(P, quitados):
+    """Baja lo que está arriba de cada ingrediente quitado. P en metros, en coordenadas del platillo."""
     Q = P.copy()
-    Q[:, 1] -= ASENTAR["baja"] * cuanto * es_hamburguesa(P) * escalon(*ASENTAR["banda"], P[:, 1])
+    for nombre in quitados:
+        y0, y1 = ASENTAR["bandas"][nombre]
+        Q[:, 1] -= (y1 - y0) * es_hamburguesa(P) * escalon(y0, y1, P[:, 1])
     return Q
 
 
-def caras_de_lechuga(P, F, UV, textura):
-    """Caras que se van con la lechuga: las verdes y las que viven enteras dentro de su banda (la sombra de atrás,
-    que al asentar quedaría aplastada). UV con la v medida desde abajo."""
+def repartir(P, F, UV, textura):
+    """A qué ingrediente pertenece cada cara: {nombre: máscara}. Con la lechuga se van las caras verdes; con cada
+    ingrediente, las que viven enteras dentro de su banda (al asentar quedarían aplastadas). UV con la v desde abajo."""
     tex = np.asarray(textura.convert("RGB")).astype(float)
     alto, ancho, _ = tex.shape
 
     def color(uv):
         return tex[np.clip((1 - uv[:, 1] % 1) * alto, 0, alto - 1).astype(int), np.clip((uv[:, 0] % 1) * ancho, 0, ancho - 1).astype(int)]
 
-    # Se mira el centro y las tres esquinas de cada cara: basta con que la mayoría sea verde.
+    # Se mira el centro y las tres esquinas de cada cara: basta con que la mitad sea verde.
     muestras = [color(UV[F].mean(axis=1))] + [color(UV[F[:, k]]) for k in range(3)]
     votos = sum(((c[:, 1] > c[:, 0] * 1.04) & (c[:, 1] > c[:, 2] * 1.2)).astype(int) for c in muestras)
     Y = P[F][:, :, 1]
-    banda = ASENTAR["banda"]
-    verdes = (votos >= 2) & (Y.mean(axis=1) > banda[0] - 0.006) & (Y.mean(axis=1) < banda[1] + 0.006)
-    dentro = (Y.min(axis=1) >= banda[0]) & (Y.max(axis=1) <= banda[1])
-    return (verdes | dentro) & (es_hamburguesa(P[F].mean(axis=1)) > 0.5)
+    zona = es_hamburguesa(P[F].mean(axis=1)) > 0.5
+    partes, tomadas = {}, np.zeros(len(F), bool)
+    for nombre, (y0, y1) in ASENTAR["bandas"].items():
+        caras = (Y.min(axis=1) >= y0) & (Y.max(axis=1) <= y1) & zona
+        if nombre == "lechuga":  # las hojas se salen de la banda y se pegan a las papas: van todas, sin importar la zona
+            caras |= (votos >= 2) & (Y.mean(axis=1) > y0 - 0.014) & (Y.mean(axis=1) < y1 + 0.014)
+        partes[nombre] = caras & ~tomadas
+        tomadas |= caras
+    return partes
 
 
 def compactar(P, F, *por_vertice):
@@ -144,7 +153,8 @@ def relleno(seg=40):
     """Cilindro oscuro escondido dentro de la hamburguesa: mientras la lechuga sale o entra, el hueco se ve
     como sombra y no deja ver el plato."""
     cx, cz = ASENTAR["centro"]
-    r, y0, y1 = 0.047, ASENTAR["banda"][0] - 0.008, ASENTAR["banda"][1] + 0.006
+    alturas = [y for banda in ASENTAR["bandas"].values() for y in banda]
+    r, y0, y1 = 0.047, min(alturas) - 0.008, max(alturas) + 0.006
     ang = np.linspace(0, 2 * np.pi, seg, endpoint=False)
     aro = np.stack([cx + r * np.cos(ang), np.zeros(seg), cz + r * np.sin(ang)], axis=1)
     P = np.concatenate([aro + [0, y0, 0], aro + [0, y1, 0]])
@@ -163,8 +173,9 @@ def hacer_glb(destino):
         partes["plato" if nodo == "plato" else "comida"] = m
     comida, plato = partes["comida"], partes["plato"]
     P, F, UV, N = np.asarray(comida.vertices), np.asarray(comida.faces), np.asarray(comida.visual.uv), np.asarray(comida.vertex_normals)
-    verdes = caras_de_lechuga(P, F, UV, comida.visual.material.baseColorTexture)
-    print(f"lechuga: {verdes.sum()} caras de {len(F)}")
+    partes = repartir(P, F, UV, comida.visual.material.baseColorTexture)
+    print({nombre: int(caras.sum()) for nombre, caras in partes.items()}, "de", len(F))
+    resto = ~np.logical_or.reduce(list(partes.values()))
 
     # Las texturas ya comprimidas del modelo publicado (mismo mapa UV que el original).
     gltf, bin_ = leer_glb(os.path.join(AQUI, "modelos/fuerte_hamburguesa.glb"))
@@ -177,7 +188,7 @@ def hacer_glb(destino):
 
     uv_gltf = UV * [1, -1] + [0, 1]  # trimesh mide la v desde abajo; glTF desde arriba
     nodos = [("plato", np.asarray(plato.vertices), np.asarray(plato.vertex_normals), None, np.asarray(plato.faces), 0), relleno()]
-    for nombre, caras in (("cuerpo", F[~verdes]), ("lechuga", F[verdes])):
+    for nombre, caras in [("cuerpo", F[resto])] + [(nombre, F[m]) for nombre, m in partes.items()]:
         p, f, n, uv = compactar(P, caras, N, uv_gltf)
         nodos.append((nombre, p, n, uv, f, 1))
     with tempfile.TemporaryDirectory() as tmp:
@@ -188,8 +199,8 @@ def hacer_glb(destino):
 
 
 # ---------- USDZ ----------
-def hacer_usdz(base, destino):
-    """Copia el USDZ de siempre y le quita la lechuga a la malla de la comida."""
+def hacer_usdz(base, destino, quitados):
+    """Copia el USDZ de siempre y le quita esos ingredientes a la malla de la comida."""
     with tempfile.TemporaryDirectory() as tmp:
         zipfile.ZipFile(base).extractall(tmp)
         stage = Usd.Stage.Open(os.path.join(tmp, "model.usdc"))
@@ -206,11 +217,11 @@ def hacer_usdz(base, destino):
             F = np.array(malla.GetFaceVertexIndicesAttr().Get()).reshape(-1, 3)
             UV = np.array(st.Get(), dtype=float)
             archivo = next(str(a.Get().path) for s in stage.Traverse() for a in s.GetAttributes() if a.GetName() == "inputs:file" and "diffuse" in s.GetName())
-            verdes = caras_de_lechuga(P, F, UV, Image.open(os.path.join(tmp, archivo)))
-            print(f"usdz: {verdes.sum()} caras de lechuga de {len(F)}")
-            nuevo = (asentar(P) - M[3, :3]) @ np.linalg.inv(M[:3, :3])
+            partes = repartir(P, F, UV, Image.open(os.path.join(tmp, archivo)))
+            fuera = np.logical_or.reduce([partes[nombre] for nombre in quitados])
+            nuevo = (asentar(P, quitados) - M[3, :3]) @ np.linalg.inv(M[:3, :3])
             malla.GetPointsAttr().Set(Vt.Vec3fArray.FromNumpy(nuevo.astype(np.float32)))
-            F = F[~verdes]
+            F = F[~fuera]
             malla.GetFaceVertexIndicesAttr().Set(Vt.IntArray.FromNumpy(F.reshape(-1).astype(np.int32)))
             malla.GetFaceVertexCountsAttr().Set(Vt.IntArray.FromNumpy(np.full(len(F), 3, dtype=np.int32)))
             normales = malla.GetNormalsAttr()
@@ -227,4 +238,4 @@ if __name__ == "__main__":
     os.makedirs(os.path.join(AQUI, "modelos/capas"), exist_ok=True)
     os.makedirs(os.path.join(AQUI, "modelos/variantes"), exist_ok=True)
     hacer_glb(os.path.join(AQUI, "modelos/capas/hamburguesa.glb"))
-    hacer_usdz(os.path.join(AQUI, "modelos/fuerte_hamburguesa.usdz"), os.path.join(AQUI, "modelos/variantes/hamburguesa_0.usdz"))
+    # Los archivos de AR para iPhone los hace herramientas/ar_iphone.py.

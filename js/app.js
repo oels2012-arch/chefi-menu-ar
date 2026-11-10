@@ -1,14 +1,14 @@
 // Lógica del menú digital: navegación, grupo, pedido, estado del pedido, cuenta, pago y encuestas.
 // No depende del diseño: busca los elementos por sus atributos data-* (ver README.md).
 
-import { CATEGORIAS, PLATILLOS, PROPINA_INICIAL, MAX_PERSONAS, ALERGIAS, MESERO, RESENA_GOOGLE, NIVELES, CALIFICAR, ASPECTOS_CHEF } from "./datos.js?v=202611101318";
-import { montarVisor, verEnMiMesa, reiniciarVisor } from "./ar.js?v=202611101318";
-import { personalizar, eleccionInicial, textoEleccion } from "./mesa.js?v=202611101318";
-import { vigilarSacudida, lluviaDeIngredientes } from "./caida.js?v=202611101318";
-import { prepararAudio, escucharDesbloqueo, desbloquearAudio, sonar, vibrar, sentir, efecto, sonidoEstrella, sonidoCarita, sonidoToque, sonidoPropina } from "./sonido.js?v=202611101318";
-import { icono, carita, billete, monedaSvg } from "./iconos.js?v=202611101318";
-import { iniciarIntro } from "./intro.js?v=202611101318";
-import { iniciarFondo, pedirMovimiento } from "./fondo.js?v=202611101318";
+import { CATEGORIAS, PLATILLOS, PROPINA_INICIAL, MAX_PERSONAS, ALERGIAS, MESERO, RESENA_GOOGLE, NIVELES, CALIFICAR, ASPECTOS_CHEF } from "./datos.js?v=202611101409";
+import { montarVisor, verEnMiMesa, reiniciarVisor } from "./ar.js?v=202611101409";
+import { personalizar, eleccionInicial, textoEleccion } from "./mesa.js?v=202611101409";
+import { vigilarSacudida, lluviaDeIngredientes } from "./caida.js?v=202611101409";
+import { prepararAudio, escucharDesbloqueo, desbloquearAudio, sonar, vibrar, sentir, efecto, sonidoEstrella, sonidoCarita, sonidoToque, sonidoPropina } from "./sonido.js?v=202611101409";
+import { icono, carita, billete, monedaSvg } from "./iconos.js?v=202611101409";
+import { iniciarIntro } from "./intro.js?v=202611101409";
+import { iniciarFondo, pedirMovimiento } from "./fondo.js?v=202611101409";
 
 const ORDEN = ["bienvenida", "mesa", "menu", "detalle", "pedido", "estado", "pago", "cuenta", "gracias"];
 const FRASES = ["El menú se digitaliza.", "Acerca tu celular.", "Elige tu platillo.", "Míralo en tu mesa.", "Pídelo.",
@@ -1037,4 +1037,4 @@ setInterval(revisarEtapa, 500);
 iniciarIntro({ mostrar: () => document.body.classList.add("listo"), mesa: estado.mesa ? `Mesa ${estado.mesa}` : "Bienvenido" });
 mostrar();
 // Panel de prueba de sonido y vibración: agregar ?prueba a la dirección.
-if (new URLSearchParams(location.search).has("prueba")) import("./prueba.js?v=202611101318").then((m) => m.abrirPrueba());
+if (new URLSearchParams(location.search).has("prueba")) import("./prueba.js?v=202611101409").then((m) => m.abrirPrueba());

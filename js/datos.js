@@ -29,14 +29,17 @@ export const PLATILLOS = [
     contiene: "Gluten, lácteos",
     ingredientes: [["pan","Pan brioche"],["carne","Carne de res"],["queso","Queso cheddar"],["tocino","Tocino"],["cebolla","Aros de cebolla"],["lechuga","Lechuga"],["jitomate","Jitomate"],["papas","Papas"]],
     // "En mi mesa": ingredientes que se pueden quitar o poner sobre el modelo 3D (ver js/mesa.js y herramientas/capas.py).
-    // El orden de las opciones es el de los bits del archivo de AR (modelos/variantes/<platillo>_<bits>.usdz).
+    // El orden de las opciones es el de los bits del archivo de AR para iPhone (modelos/variantes/<platillo>_<bits>.usdz,
+    // hechos con herramientas/ar_iphone.py: traen placas 3D para quitar y poner el ingrediente dentro de la cámara).
     personalizar: {
       modelo: "modelos/capas/hamburguesa.glb",
       variantes: "modelos/variantes/hamburguesa_{bits}.usdz",
-      fijas: { 1: "modelos/fuerte_hamburguesa.usdz" },
-      opciones: [{ id: "lechuga", nombre: "Lechuga", icono: "lechuga", incluido: true, tipo: "anillo" }],
-      // Al quitar la lechuga, lo de arriba se asienta. Mismas medidas (metros) que herramientas/lechuga.py.
-      asentar: { con: "lechuga", centro: [0.006, 0.04], radio: [0.058, 0.066], frente: [-0.012, 0], banda: [0.029, 0.042], baja: 0.013 },
+      opciones: [
+        { id: "lechuga", nombre: "Lechuga", icono: "lechuga", incluido: true, tipo: "anillo" },
+        { id: "carne", nombre: "Doble carne", sin: "Carne sencilla", icono: "carne", incluido: true, tipo: "anillo" },
+      ],
+      // Al quitar un ingrediente, lo de arriba baja el alto de su banda. Mismas medidas (metros) que herramientas/lechuga.py.
+      asentar: { centro: [0.006, 0.04], radio: [0.058, 0.066], frente: [-0.012, 0], alto: [0.08, 0.09], bandas: { lechuga: [0.029, 0.042], carne: [0.042, 0.058] } },
     },
   },
   {
@@ -59,7 +62,6 @@ export const PLATILLOS = [
     personalizar: {
       modelo: "modelos/capas/pasta.glb",
       variantes: "modelos/variantes/pasta_{bits}.usdz",
-      fijas: { 0: "modelos/pasta_bolognesa.usdz" },
       opciones: [{ id: "parmesano", nombre: "Parmesano", icono: "parmesano", incluido: false, tipo: "lluvia" }],
     },
   },
@@ -83,7 +85,6 @@ export const PLATILLOS = [
     personalizar: {
       modelo: "modelos/capas/ensalada.glb",
       variantes: "modelos/variantes/ensalada_{bits}.usdz",
-      fijas: { 0: "modelos/ensalada.usdz" },
       opciones: [{ id: "crotones", nombre: "Crotones", icono: "crotones", incluido: false, tipo: "lluvia" }],
     },
   },
@@ -107,7 +108,6 @@ export const PLATILLOS = [
     personalizar: {
       modelo: "modelos/capas/pastel.glb",
       variantes: "modelos/variantes/pastel_{bits}.usdz",
-      fijas: { 0: "modelos/postre_pastel.usdz" },
       opciones: [{ id: "cereza", nombre: "Cereza", icono: "cereza", incluido: false, tipo: "posar" }],
     },
   },

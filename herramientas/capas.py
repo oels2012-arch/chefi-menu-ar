@@ -554,7 +554,7 @@ def main():
             escribir_glb(suelto, nodos, png)
             gltf_transform("merge", os.path.join(AQUI, f"modelos/{archivo}.glb"), suelto, unido, "--merge-scenes")
             gltf_transform("draco", unido, os.path.join(capas_dir, f"{clave}.glb"))
-        usdz_con_extras(os.path.join(AQUI, f"modelos/{archivo}.usdz"), os.path.join(var_dir, f"{clave}_1.usdz"), nodos, png)
+        # El archivo de AR para iPhone lo hace herramientas/ar_iphone.py (con placas para tocar dentro de la cámara).
         print(clave, [n for n, _ in extras])
 
 
