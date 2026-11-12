@@ -76,7 +76,7 @@ def piezas_dibujadas():
                 m.P = m.P * [1.13, 0.86, 1.13]
         if paso["id"] == "queso":
             for m in mallas:
-                m.P = m.P * [0.93, 1, 0.93]
+                m.P = m.P * [0.86, 1.25, 0.86]  # asoma solo la orilla, un poco más gruesa
         hechas[paso["id"]] = [m.mover([cx, paso["pone"], cz]) for m in mallas]
     return hechas
 

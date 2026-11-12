@@ -11,8 +11,8 @@
 // - "capa" (jitomate y queso extra de la hamburguesa): piezas dibujadas que entran entre dos capas y levantan lo de arriba.
 // - "lluvia" (parmesano, crotones) y "posar" (cereza): extras agregados con herramientas/capas.py.
 
-import { icono } from "./iconos.js?v=202611101424";
-import { efecto, vibrar } from "./sonido.js?v=202611101424";
+import { icono } from "./iconos.js?v=202611121229";
+import { efecto, vibrar } from "./sonido.js?v=202611121229";
 
 const ES_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && "ontouchend" in document);
 

@@ -275,13 +275,32 @@ def cilindro(cx, cz, r, y0, y1, seg=40):
 
 
 def hamburguesa(destino_dir):
-    """Cada paso (ver lechuga.ASENTAR["pasos"]) abre un nivel: un Xform que contiene todo lo que queda encima y
-    que baja (si se quita un ingrediente escaneado) o sube (si se pone uno dibujado). Los niveles van anidados."""
+    """La hamburguesa escaneada partida en piezas rígidas, TODAS al mismo nivel (hermanas, sin anidar).
+
+    Probado con scratchpad/toca.swift y en el iPhone de Eddy: el motor de Apple entiende el destino de una acción
+    Transform en el espacio de la escena, no en el del padre, así que mover un Xform que está dentro de otro Xform ya
+    movido lo deja flotando. Por eso aquí no hay niveles anidados: cada pieza tiene escrita su postura exacta para
+    cada combinación de ingredientes, y cada placa pertenece a una combinación (tocarla lleva a la combinación vecina).
+    """
     pasos = lechuga.ASENTAR["pasos"]
+    ids = [p["id"] for p in pasos]
     cx, cz = lechuga.ASENTAR["centro"]
-    png = dibujar_placas([TEXTOS_HAMBURGUESA[p["id"]] for p in pasos])
+    bandas = lechuga.ASENTAR["bandas"]
+    png = dibujar_placas([TEXTOS_HAMBURGUESA[i] for i in ids])
     paleta = capas.paleta_png()
-    for estado in combinaciones(len(pasos)):
+    estados = combinaciones(len(pasos))
+
+    def salto(paso, puesto):
+        """Cuánto sube lo que queda encima de este paso."""
+        if "quita" in paso:
+            return 0.0 if puesto else -(paso["quita"][1] - paso["quita"][0])
+        return paso["alto"] if puesto else 0.0
+
+    def altura(estado, hasta):
+        """Desplazamiento de lo que está justo debajo del paso número `hasta`."""
+        return sum(salto(p, e) for p, e in list(zip(pasos, estado))[:hasta])
+
+    for inicial in estados:
         dibujadas = lechuga.piezas_dibujadas()
         with tempfile.TemporaryDirectory() as tmp:
             zipfile.ZipFile(os.path.join(AQUI, "modelos/fuerte_hamburguesa.usdz")).extractall(tmp)
@@ -300,61 +319,93 @@ def hamburguesa(destino_dir):
             centro_cara = P[F].mean(axis=1)
             zona = lechuga.es_hamburguesa(centro_cara) > 0.5
             y = centro_cara[:, 1]
+            l0, l1 = bandas["lechuga"]
+            c0, c1 = bandas["carne"]
 
             raiz = escena(stage) + "/Hamburguesa"
             UsdGeom.Xform.Define(stage, raiz)
             oscuro = material_color(stage, raiz + "/MatRelleno", (0.07, 0.035, 0.02), 0.9)
-            tomadas = np.zeros(len(F), bool)
-            opciones, nivel, piso = [], raiz, 0.0  # piso: desde qué altura las caras fijas son de este nivel
-            niveles = [(raiz, 0.0)]
-            for paso in pasos:
-                ident = paso["id"]
-                pieza = f"{nivel}/{ident.capitalize()}"
-                UsdGeom.Xform.Define(stage, pieza)
-                arriba = f"{nivel}/Sobre{ident.capitalize()}"
-                UsdGeom.Xform.Define(stage, arriba)
-                if "quita" in paso:
-                    y0, y1 = paso["quita"]
-                    # Con la lechuga solo se van sus hojas; con la carne, todo lo que vive a su altura.
-                    caras = partes[ident] if ident == "lechuga" else (partes[ident] | (zona & (y >= y0) & (y < y1) & ~tomadas))
-                    tomadas |= caras
-                    p, f, st = lechuga.compactar(P, F[caras], UV)
-                    malla(stage, pieza + "/Malla", p, f, st, material, doble=True)
-                    centro = (cx, (y0 + y1) / 2, cz)
-                    sube = (arriba, Gf.Matrix4d(1.0), matriz(traslada=(0, -(y1 - y0), 0)))
-                    piso = y0
-                else:
-                    capas.agregar_usd(stage, pieza, [("pieza", dibujadas[ident], [0, 0, 0], None)], "paleta.png")
-                    centro = (cx, paso["pone"] + paso["alto"] / 2, cz)
-                    sube = (arriba, matriz(traslada=(0, paso["alto"], 0)), Gf.Matrix4d(1.0))
-                    piso = paso["pone"]
-                opciones.append({"id": ident, "pieza": pieza, "centro": centro, "sube": sube})
-                nivel = arriba
-                niveles.append((nivel, piso))
-            # Las caras fijas van al nivel más alto que empieza por debajo de ellas (las papas, siempre a la base).
-            libres = ~tomadas
-            for k, (ruta, desde) in enumerate(niveles):
-                hasta = min([d for _, d in niveles[k + 1:] if d > desde] or [np.inf])
-                mas_altos = [d for _, d in niveles[k + 1:]]
-                if k and desde in mas_altos:  # otro nivel más alto empieza a la misma altura: se las queda él
-                    caras = np.zeros(len(F), bool)
-                elif k == 0:
-                    caras = libres & (~zona | (y < hasta))
-                else:
-                    caras = libres & zona & (y >= desde) & (y < hasta)
-                if caras.any():
-                    p, f, st = lechuga.compactar(P, F[caras], UV)
-                    malla(stage, f"{ruta}/Fijo", p, f, st, material, doble=True)
-                # Un tramo de relleno oscuro por nivel: nunca se ve el plato ni la mesa a través de la hamburguesa.
-                # Delgado y bajo, para que no se asome por donde la hamburguesa se angosta.
-                y0 = 0.02 if k == 0 else desde - 0.007
-                y1 = (hasta if np.isfinite(hasta) else desde) + 0.002
-                if k == 0 or desde not in mas_altos:
-                    pr, fr = cilindro(cx, cz, 0.042, y0, y1)
-                    malla(stage, f"{ruta}/Relleno", pr, fr, None, oscuro, doble=True)
+
+            def pieza_escaneada(nombre, caras, relleno=None):
+                ruta = f"{raiz}/{nombre}"
+                UsdGeom.Xform.Define(stage, ruta)
+                p, f, st = lechuga.compactar(P, F[caras], UV)
+                malla(stage, ruta + "/Malla", p, f, st, material, doble=True)
+                if relleno:  # tramo oscuro por dentro: tapa las rendijas entre piezas
+                    pr, fr = cilindro(cx, cz, 0.042, *relleno)
+                    malla(stage, ruta + "/Relleno", pr, fr, None, oscuro, doble=True)
+                return ruta
+
+            def pieza_dibujada(nombre, ident):
+                ruta = f"{raiz}/{nombre}"
+                UsdGeom.Xform.Define(stage, ruta)
+                capas.agregar_usd(stage, ruta, [("pieza", dibujadas[ident], [0, 0, 0], None)], "paleta.png")
+                return ruta
+
+            en_lechuga = partes["lechuga"] | (zona & (y >= l0) & (y < l1))
+            en_carne = ~en_lechuga & zona & (y >= c0) & (y < c1)
+            arriba = ~en_lechuga & zona & (y >= c1)
+            base = ~(en_lechuga | en_carne | arriba)
+            pieza_escaneada("Base", base, (0.02, l0 + 0.002))
+            # nombre: (ruta, centro para encogerse, cuántos pasos tiene debajo, id del ingrediente que la muestra o None)
+            objetos = {
+                "Lechuga": (pieza_escaneada("Lechuga", en_lechuga), (cx, (l0 + l1) / 2, cz), 0, "lechuga"),
+                "Jitomate": (pieza_dibujada("Jitomate", "jitomate"), (cx, l1 + 0.003, cz), 1, "jitomate"),
+                "Carne": (pieza_escaneada("Carne", en_carne, (c0 - 0.006, c1)), (cx, (c0 + c1) / 2, cz), 2, "carne"),
+                "Queso": (pieza_dibujada("Queso", "queso"), (cx, c1 + 0.002, cz), 3, "queso"),
+                "Arriba": (pieza_escaneada("Arriba", arriba, (c1 - 0.007, c1 + 0.002)), None, 4, None),
+            }
             stage.RemovePrim(original.GetPath())
-            interactivo(stage, opciones, estado, "placas.png")
-            empacar(tmp, stage, os.path.join(destino_dir, f"hamburguesa_{nombre_bits(estado)}.usdz"))
+
+            def postura(nombre, estado):
+                ruta, centro, debajo, ident = objetos[nombre]
+                sube = matriz(traslada=(0, altura(estado, debajo), 0))
+                if ident is None or estado[ids.index(ident)]:
+                    return sube
+                return matriz(escala=MINI, centro=centro) * sube
+
+            # Posturas de cada pieza para cada combinación (Xform vacíos que sirven de destino).
+            destinos = raiz + "/Destinos"
+            UsdGeom.Scope.Define(stage, destinos)
+            for nombre, (ruta, *_resto) in objetos.items():
+                UsdGeom.Xformable(stage.GetPrimAtPath(ruta)).ClearXformOpOrder()
+                UsdGeom.Xformable(stage.GetPrimAtPath(ruta)).AddTransformOp().Set(postura(nombre, inicial))
+                for estado in estados:
+                    xform(stage, f"{destinos}/{nombre}_{nombre_bits(estado)}", postura(nombre, estado))
+
+            # Placas: cuatro por combinación, todas en su lugar; solo se ven las de la combinación actual.
+            chefi = escena(stage) + "/Chefi"
+            UsdGeom.Xform.Define(stage, chefi)
+            mat_placa = material_imagen(stage, chefi + "/MatPlacas", "placas.png")
+            mat_borde = material_color(stage, chefi + "/MatBorde", (0.12, 0.12, 0.12))
+            n = len(ids)
+            lugares = []
+            for k, ident in enumerate(ids):
+                col, fila = k % 2, k // 2
+                x = (col - 0.5) * (PLACA_ANCHO + 0.012)
+                lugar = matriz(traslada=(x, PLACA_Y + (1 - fila) * (PLACA_ALTO * 0.86), PLACA_Z + fila * 0.03), gira_x=-PLACA_INCLINA)
+                xform(stage, f"{chefi}/Lugar_{ident}", lugar)
+                xform(stage, f"{chefi}/Guardada_{ident}", matriz(escala=MINI) * lugar)
+                lugares.append(lugar)
+                for estado in estados:
+                    ruta = f"{chefi}/Placa_{ident}_{nombre_bits(estado)}"
+                    xform(stage, ruta, lugar if estado == inicial else matriz(escala=MINI) * lugar)
+                    Pm, Fm, st = malla_placa(k * 2 + (0 if estado[k] else 1), n * 2)
+                    malla(stage, ruta + "/Cara", Pm + [0, 0, 0.0006], Fm, st, mat_placa, doble=True)
+                    Pb, Fb, _ = malla_placa(0, 1, borde=True)
+                    malla(stage, ruta + "/Borde", Pb, Fb, None, mat_borde, doble=True)
+
+            toques = Comportamientos(stage, chefi + "/Toques")
+            for estado in estados:
+                bits = nombre_bits(estado)
+                for k, ident in enumerate(ids):
+                    nuevo = tuple(not e if j == k else e for j, e in enumerate(estado))
+                    nb = nombre_bits(nuevo)
+                    movimientos = [(ruta, f"{destinos}/{nombre}_{nb}", 0.45) for nombre, (ruta, *_r) in objetos.items()]
+                    movimientos += [(f"{chefi}/Placa_{i}_{bits}", f"{chefi}/Guardada_{i}", 0.15) for i in ids]
+                    movimientos += [(f"{chefi}/Placa_{i}_{nb}", f"{chefi}/Lugar_{i}", 0.15) for i in ids]
+                    toques.al_tocar(f"{chefi}/Placa_{ident}_{bits}", movimientos)
+            empacar(tmp, stage, os.path.join(destino_dir, f"hamburguesa_{nombre_bits(inicial)}.usdz"))
 
 
 # ---------- Pasta, pastel y ensalada: el modelo de siempre + el extra ----------
