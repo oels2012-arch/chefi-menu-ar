@@ -371,8 +371,8 @@ const HAPTICOS = {
   logo: [120, 50, 280],
 };
 
-export function efecto(nombre, conVibracion = true) {
-  if (conVibracion && HAPTICOS[nombre]) haptico(HAPTICOS[nombre]);
+export function efecto(nombre, conVibracion = true, opciones) {
+  if (conVibracion && HAPTICOS[nombre]) haptico(HAPTICOS[nombre], opciones);
   if (!EFECTOS[nombre]) return;
   cuandoSuene(() => EFECTOS[nombre]());
 }
@@ -389,7 +389,7 @@ export function sonidoLogo(volumen = 1) {
 
 // Propina: cada punto da un clic que se siente más fuerte cuanto más alta la propina; cada 5 % un "tope" marcado.
 export function sonidoPropina(porcentaje, conVibracion = true) {
-  if (conVibracion) haptico(porcentaje % 5 === 0 ? [55 + porcentaje * 2] : [22 + porcentaje]);
+  if (conVibracion) haptico(porcentaje % 5 === 0 ? [55 + porcentaje * 2] : [22 + porcentaje], { arrastre: true });
   if (!audioActivo()) return cuandoSuene(() => sonidoPropina(porcentaje, false));
   roce(0, 0.09, 4500, 0.008);
   gota(1000 + porcentaje * 25, 0, 0.16, 0.08);
@@ -397,10 +397,53 @@ export function sonidoPropina(porcentaje, conVibracion = true) {
 
 // ---------- Vibración ----------
 // Android: Vibration API (patrones de duración; la fuerza la pone el celular).
-// iPhone (iOS 18+): no tiene Vibration API; tocar un interruptor nativo produce un golpe háptico (el del Taptic
-// Engine), con fuerza fija y solo durante un toque del usuario. Los patrones se arman con varios golpes.
-// El interruptor tiene que estar "dibujado" (dentro de la pantalla aunque invisible): con display:none el
-// iPhone no da el golpe.
+//
+// iPhone: Safari no tiene Vibration API. Lo único que hace vibrar al iPhone desde una página es un interruptor
+// nativo (<input type="checkbox" switch>) al cambiar: da el golpe del Taptic Engine, con fuerza fija.
+// - Hasta iOS 26.4 bastaba "tocarlo" por programa. Desde iOS 26.5 Apple lo bloqueó: solo vibra cuando lo cambia
+//   un toque REAL del dedo. Por eso ya no vibraba nada.
+// - Solución (prepararHapticos): cada botón lleva encima una etiqueta transparente ligada a un interruptor oculto.
+//   El dedo toca esa etiqueta, el iPhone da su golpe y el clic sube al botón como siempre.
+// - Límites que pone iOS: un solo golpe por toque (sin patrones largos), nada al arrastrar una barra y nada sin
+//   toque (avisos de "preparando", "en tu mesa", golpe del logo si no lo dispara el dedo).
+const SELECTOR_HAPTICO = "button:not([type=submit]):not(.sin-haptico), .tarjeta[data-accion], [data-haptico]";
+
+function ponerEtiqueta(el) {
+  if (el.querySelector(":scope > label.hap")) return;
+  const etiqueta = document.createElement("label");
+  etiqueta.className = "hap";
+  etiqueta.setAttribute("aria-hidden", "true");
+  const entrada = document.createElement("input");
+  entrada.type = "checkbox";
+  entrada.setAttribute("switch", "");
+  entrada.tabIndex = -1;
+  etiqueta.append(entrada);
+  el.append(etiqueta);
+}
+
+let hapticosListos = false;
+export function prepararHapticos() {
+  if (!ES_IOS || hapticosListos) return;
+  hapticosListos = true;
+  // El clic sobre la etiqueta ya subió al botón; el segundo clic (el que la etiqueta le pasa al interruptor)
+  // no debe contar como otro toque.
+  document.addEventListener("click", (evento) => {
+    if (evento.target.matches?.("label.hap > input")) evento.stopPropagation();
+  }, true);
+  let pendiente = false;
+  const revisar = () => {
+    pendiente = false;
+    document.querySelectorAll(SELECTOR_HAPTICO).forEach(ponerEtiqueta);
+  };
+  revisar();
+  new MutationObserver(() => {
+    if (pendiente) return;
+    pendiente = true;
+    requestAnimationFrame(revisar);
+  }).observe(document.body, { childList: true, subtree: true });
+}
+
+// Golpe por programa: solo sirve en iOS 17.4 a 26.4. En 26.5+ el iPhone lo ignora (no estorba).
 let interruptor = null;
 export function golpeIOS() {
   if (!interruptor?.isConnected) {
@@ -413,13 +456,14 @@ export function golpeIOS() {
     entrada.tabIndex = -1;
     entrada.style.margin = "0";
     interruptor.append(entrada);
+    interruptor.addEventListener("click", (evento) => evento.stopPropagation());
     document.body.append(interruptor);
   }
   interruptor.click();
 }
 
-// Reproduce un patrón [vibra, pausa, vibra, ...].
-export function haptico(patron) {
+// Reproduce un patrón [vibra, pausa, vibra, ...]. `arrastre`: viene de mover una barra (no de un toque).
+export function haptico(patron, { arrastre = false } = {}) {
   const pulsos = Array.isArray(patron) ? patron : [patron];
   if (navigator.vibrate) {
     // Android no deja elegir la fuerza: los pulsos de menos de ~30 ms casi no se sienten.
@@ -427,23 +471,21 @@ export function haptico(patron) {
     try { navigator.vibrate(fuerte); } catch {}
     return;
   }
-  // iPhone: un golpe por pulso al mismo ritmo; los pulsos largos (más "pesados") llevan un segundo golpe pegado.
+  // iPhone: el primer golpe lo da el propio toque (la etiqueta del botón). Mientras se arrastra una barra no se
+  // toca nada por programa: en el iPhone eso le quita el dedo a la barra y la deja trabada.
+  if (!ES_IOS || arrastre) return;
+  // Golpes siguientes del patrón: solo los siente iOS 26.4 o anterior.
   let t = 0;
   const golpes = [];
   pulsos.forEach((ms, i) => {
-    if (i % 2 === 0) {
-      golpes.push(t);
-      if (ms >= 110) golpes.push(t + 55);
-      if (ms >= 260) golpes.push(t + 110);
-    }
+    if (i % 2 === 0 && t > 0) golpes.push(t);
     t += ms;
   });
   let ultimo = -999;
-  for (const g of golpes) {
-    const cuando = Math.max(g, ultimo + 50); // más juntos se funden en uno
+  for (const g of golpes.slice(0, 3)) {
+    const cuando = Math.max(g, ultimo + 60);
     ultimo = cuando;
-    if (cuando === 0) golpeIOS();
-    else setTimeout(golpeIOS, cuando);
+    setTimeout(golpeIOS, cuando);
   }
 }
 

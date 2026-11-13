@@ -2,10 +2,10 @@
 
 Menú web del restaurante. El comensal acerca el celular a la tarjeta NFC de la mesa y se abre esta página en el navegador, sin instalar ninguna app:
 
-1. **Intro**: logo reveal de Chefi dibujado en vivo en SVG (`js/intro.js`), con los tiempos de `ChaosLogo` del video en Remotion. Arranca solo; el primer toque activa el sonido y la vibración.
+1. **Intro**: logo reveal de Chefi dibujado en vivo en SVG (`js/intro.js`), con los tiempos de `ChaosLogo` del video en Remotion. Siempre lleva sonido: como el celular no deja sonar una página hasta que se toca, espera con "Toca para entrar" y ese toque arranca el logo con su sonido.
 2. **Bienvenida**: las acciones de la experiencia y "Así funciona" en 5 pasos animados. Un solo botón: **Empezar**.
 3. **¿Solo o con amigos?**: se agregan los nombres y se decide antes de pedir cómo se divide la cuenta (partes iguales o cada quien lo suyo).
-4. **Menú y platillo en 3D**: se gira; si se sacude, se cae y la pantalla se llena de ingredientes. **Ver en mi mesa** lo pone a tamaño real con la cámara, con su información nutricional (iPhone: banner de AR Quick Look con botón "Agregar al pedido"; Android: etiqueta flotante en WebXR).
+4. **Menú y platillo**: la pantalla del platillo es una foto realista. En "A tu gusto" se quitan o ponen ingredientes (hamburguesa: lechuga y jitomate; pasta: parmesano; ensalada: crotones; pastel: cereza) y la foto cambia a la de esa combinación. **Ver en mi mesa** abre la cámara y pone el platillo en 3D a tamaño real, tal como se eligió: solo el platillo, sin botones (iPhone: AR Quick Look con `.usdz`; Android: Scene Viewer con `.glb`).
 5. **Pedido**: alergias comunes con ícono, otra alergia escrita y notas; con amigos, "¿para quién es?". Cada acción vibra y suena.
 6. **Estado**: recibido → preparando (5 s) → en tu mesa (10 s), con vibración y sonido en cada etapa.
 7. **Pago**: primero el método, luego la cuenta clara con propina libre (0–30 %) y división en partes iguales o por lo que consumió cada quien.
@@ -19,7 +19,7 @@ Desde esta carpeta:
 python3 -m http.server 8000
 ```
 
-Abre http://localhost:8000/?mesa=4 en el navegador. En la computadora el 3D se puede girar, pero la cámara AR solo abre en el celular, y tiene que ser con la página publicada en https.
+Abre http://localhost:8000/?mesa=4 en el navegador. La cámara AR solo abre en el celular, y tiene que ser con la página publicada en https.
 
 ## Qué archivo es de quién
 
@@ -30,14 +30,16 @@ Abre http://localhost:8000/?mesa=4 en el navegador. En la computadora el 3D se p
 | `img/` | Fotos de los platillos | Diego, si quiere cambiarlas |
 | `js/datos.js` | Platillos, precios, categorías y propinas | Cualquiera |
 | `js/app.js` | Navegación, pedido, cuenta y pago | Eddy / Claude |
-| `js/ar.js` | Experiencia inmersiva "Ver en mi mesa" | Eddy / Claude |
-| `js/caida.js` | "Se cayó el platillo": lluvia de ingredientes | Eddy / Claude |
+| `js/ar.js` | "Ver en mi mesa": abre la cámara con el modelo de la combinación elegida | Eddy / Claude |
 | `js/sonido.js` | Efectos de sonido y vibración | Eddy / Claude |
 | `js/intro.js` | Intro con el logo reveal | Eddy / Claude |
 | `js/iconos.js` | Íconos SVG (la interfaz nunca usa emojis) | Eddy / Claude |
 | `js/fondo.js` | Fondo con profundidad (paralaje) | Eddy / Claude |
 | `media/` | Efectos de sonido | No tocar |
-| `modelos/` | Modelos 3D a escala real (plato de 27 cm): `.glb` para web/Android y `.usdz` para iPhone | No tocar |
+| `modelos/` | Modelos 3D a escala real (plato de 27 cm): `.glb` para Android y `.usdz` para iPhone. `modelos/variantes/` tiene uno por combinación de ingredientes | No tocar |
+| `img/variantes/` | Foto de cada combinación de ingredientes | No tocar |
+| `herramientas/variantes.py` | Prepara los modelos de cada variante (tamaño real, plato, GLB y USDZ) | Eddy / Claude |
+| `herramientas/toca.swift` | Revisa en la Mac los `.usdz` con el motor de Apple antes de subirlos | Eddy / Claude |
 
 ## Regla para el diseño: los atributos `data-*`
 

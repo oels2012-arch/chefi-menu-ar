@@ -1,14 +1,12 @@
 // Lógica del menú digital: navegación, grupo, pedido, estado del pedido, cuenta, pago y encuestas.
 // No depende del diseño: busca los elementos por sus atributos data-* (ver README.md).
 
-import { CATEGORIAS, PLATILLOS, PROPINA_INICIAL, MAX_PERSONAS, ALERGIAS, MESERO, RESENA_GOOGLE, NIVELES, CALIFICAR, ASPECTOS_CHEF } from "./datos.js?v=202611121229";
-import { montarVisor, verEnMiMesa, reiniciarVisor } from "./ar.js?v=202611121229";
-import { personalizar, eleccionInicial, textoEleccion } from "./mesa.js?v=202611121229";
-import { vigilarSacudida, lluviaDeIngredientes } from "./caida.js?v=202611121229";
-import { prepararAudio, escucharDesbloqueo, desbloquearAudio, sonar, vibrar, sentir, efecto, sonidoEstrella, sonidoCarita, sonidoToque, sonidoPropina } from "./sonido.js?v=202611121229";
-import { icono, carita, billete, monedaSvg } from "./iconos.js?v=202611121229";
-import { iniciarIntro } from "./intro.js?v=202611121229";
-import { iniciarFondo, pedirMovimiento } from "./fondo.js?v=202611121229";
+import { CATEGORIAS, PLATILLOS, PROPINA_INICIAL, MAX_PERSONAS, ALERGIAS, MESERO, RESENA_GOOGLE, NIVELES, CALIFICAR, ASPECTOS_CHEF } from "./datos.js?v=202611131102";
+import { verEnMiMesa, arDisponible, archivosDe, precargarAR } from "./ar.js?v=202611131102";
+import { prepararAudio, escucharDesbloqueo, prepararHapticos, sentir, efecto, sonidoEstrella, sonidoCarita, sonidoToque, sonidoPropina } from "./sonido.js?v=202611131102";
+import { icono, carita, billete, monedaSvg } from "./iconos.js?v=202611131102";
+import { iniciarIntro } from "./intro.js?v=202611131102";
+import { iniciarFondo } from "./fondo.js?v=202611131102";
 
 const ORDEN = ["bienvenida", "mesa", "menu", "detalle", "pedido", "estado", "pago", "cuenta", "gracias"];
 const FRASES = ["El menú se digitaliza.", "Acerca tu celular.", "Elige tu platillo.", "Míralo en tu mesa.", "Pídelo.",
@@ -29,6 +27,7 @@ const estado = {
   actual: null, // id del platillo abierto
   cantidad: 1,
   alergias: [], // alergias marcadas en el platillo abierto
+  personal: {}, // ingredientes del platillo abierto: id → true (lo lleva) o false (sin él)
   para: 0, // a quién se le carga el platillo abierto (índice en grupo.personas)
   grupo: { personas: ["Tú"], modo: "iguales" },
   pedido: [],   // lo que aún no se envía a cocina: { id, cantidad, notas, para }
@@ -113,21 +112,38 @@ function avatar(el, i) {
 // ---------- Navegación ----------
 // Cada pantalla tiene su dirección: #menu, #platillo/pasta, #pedido, #cuenta...
 
+// El número de pantallas recorridas va guardado en el historial del navegador (history.state.n), así "regresar"
+// sabe si tiene a dónde ir aunque la página se haya recargado o se haya regresado con el gesto del celular.
 function ir(destino) {
-  location.hash = destino;
+  if (location.hash.slice(1) === destino) return mostrar();
+  history.pushState({ n: (history.state?.n ?? 0) + 1 }, "", `#${destino}`);
+  mostrar();
+}
+// Cambia de pantalla sin dejar la actual en el historial (para que "regresar" no caiga en una pantalla vacía).
+function reemplazar(destino) {
+  history.replaceState(history.state, "", `#${destino}`);
+  mostrar();
+}
+// "Regresar": si la página se abrió directo en esta pantalla, el historial no tiene a dónde ir y el botón se
+// quedaba sin hacer nada; entonces va a la pantalla anterior del recorrido.
+const ANTERIOR = { mesa: "bienvenida", menu: "mesa", detalle: "menu", pedido: "menu", estado: "menu", pago: "estado", cuenta: "pago", gracias: "menu" };
+function regresar() {
+  if ((history.state?.n ?? 0) > 0) history.back();
+  else reemplazar(ANTERIOR[vistaActual()] ?? "bienvenida");
 }
 
 function mostrar() {
   const [nombre = "bienvenida", parametro] = location.hash.slice(1).split("/");
   const destino = nombre === "platillo" ? "detalle" : nombre || "bienvenida";
-  if (!pantalla(destino)) return ir("bienvenida");
+  if (!pantalla(destino)) return reemplazar("bienvenida");
+  // Sin pedido enviado no hay estado, pago ni cuenta que mostrar (pasa al regresar después de pagar).
+  if (["estado", "pago", "cuenta"].includes(destino) && !estado.enviados.length) return reemplazar("menu");
 
   const antes = ORDEN.indexOf(vistaActual());
   document.body.dataset.dir = antes > ORDEN.indexOf(destino) ? "atras" : "adelante";
   document.querySelectorAll("[data-pantalla]").forEach((s) => (s.hidden = s.dataset.pantalla !== destino));
   document.body.dataset.vista = destino;
   document.querySelector('[data-accion="atras"]').hidden = destino === "bienvenida";
-  cerrarCaida();
   ({ bienvenida: pintarBienvenida, mesa: pintarMesa, menu: pintarMenu, detalle: () => pintarDetalle(parametro),
      pedido: pintarPedido, estado: pintarEstado, pago: pintarPago, cuenta: pintarCuenta, gracias: pintarGracias })[destino]?.();
   pintarBarra();
@@ -213,7 +229,6 @@ function pintarMesa() {
 // ---------- 3. Menú ----------
 
 function pintarMenu() {
-  precargarModelos();
   lista("categorias").replaceChildren(...CATEGORIAS.map((c) => {
     const chip = copiar("categoria");
     chip.textContent = c.nombre;
@@ -237,31 +252,94 @@ function pintarMenu() {
 
 // ---------- 4. Detalle ----------
 
-let visorVigilado = false;
+// Ingredientes tal como salen de cocina: id → true (lo lleva) o false.
+const eleccionInicial = (p) => Object.fromEntries((p.personalizar?.opciones ?? []).map((o) => [o.id, o.incluido]));
+// Lo que cambió respecto al platillo de siempre, para la nota de cocina: "Sin lechuga · Con jitomate".
+function textoEleccion(p, eleccion) {
+  return (p.personalizar?.opciones ?? []).filter((o) => (eleccion?.[o.id] ?? o.incluido) !== o.incluido)
+    .map((o) => `${o.incluido ? "Sin" : "Con"} ${o.nombre.toLowerCase()}`).join(" · ");
+}
+
+// La foto del platillo. Al cambiar un ingrediente, la foto de esa combinación entra encima de la anterior.
+let fotoPuesta = "";
+function ponerFoto(src, animar = false) {
+  const caja = ref("foto-platillo");
+  if (src === fotoPuesta && caja.querySelector("img.visible")) return;
+  fotoPuesta = src;
+  const img = new Image();
+  img.alt = "";
+  img.decoding = "async";
+  img.src = src;
+  if (!animar) {
+    img.className = "visible";
+    return caja.replaceChildren(img);
+  }
+  const entrar = () => {
+    if (fotoPuesta !== src) return; // ya se eligió otra combinación
+    caja.querySelectorAll("img").forEach((vieja) => {
+      vieja.className = "sale";
+      setTimeout(() => vieja.remove(), 450);
+    });
+    caja.append(img);
+    void img.offsetWidth;
+    img.className = "visible";
+  };
+  if (img.complete && img.naturalWidth) entrar();
+  else {
+    img.onload = entrar;
+    img.onerror = () => { if (fotoPuesta === src) fotoPuesta = ""; }; // sin red: se queda la foto anterior
+  }
+}
+
+// Interruptores de "A tu gusto".
+function pintarGusto() {
+  const p = platillo(estado.actual);
+  const opciones = p.personalizar?.opciones ?? [];
+  ref("a-tu-gusto").hidden = opciones.length === 0;
+  lista("gusto").replaceChildren(...opciones.map((o) => {
+    const boton = copiar("gusto");
+    const lleva = estado.personal[o.id] ?? o.incluido;
+    boton.dataset.valor = o.id;
+    boton.querySelector(".gusto-icono").innerHTML = icono(o.icono);
+    boton.querySelector(".gusto-nombre").textContent = o.nombre;
+    boton.querySelector(".gusto-estado").textContent = lleva ? `Con ${o.nombre.toLowerCase()}` : `Sin ${o.nombre.toLowerCase()}`;
+    boton.classList.toggle("activo", lleva);
+    boton.setAttribute("aria-pressed", lleva);
+    return boton;
+  }));
+  const cambio = textoEleccion(p, estado.personal);
+  ref("foto-sello").hidden = !cambio;
+  texto("foto-sello-texto", cambio);
+  texto("ar-detalle", cambio ? `En 3D, tamaño real · ${cambio.toLowerCase()}` : "En 3D y a tamaño real");
+}
+
+let primeraPintura = true;
 function pintarDetalle(id) {
   const p = platillo(id);
-  if (!p) return ir("menu");
+  if (!p) return reemplazar("menu");
+  // Si la página se recargó con el platillo abierto (pasa al volver de la cámara), se conserva lo elegido.
+  const conservar = primeraPintura && estado.actual === p.id;
+  primeraPintura = false;
   estado.actual = p.id;
-  estado.cantidad = 1;
-  estado.alergias = [];
-  estado.personal = eleccionInicial(p); // ingredientes puestos o quitados con los botones del visor
+  if (!conservar) {
+    estado.cantidad = 1;
+    estado.alergias = [];
+    estado.personal = eleccionInicial(p);
+  }
+  estado.personal = { ...eleccionInicial(p), ...estado.personal };
 
   const raiz = pantalla("detalle");
-  const conModelo = Boolean(p.modelo);
-  if (conModelo) {
-    const visor = montarVisor(ref("visor", raiz), p, { alAgregar: agregarDesdeRA });
-    visor.classList.remove("cayendo");
-    personalizar(visor, p, estado.personal, { alCambiar: (eleccion) => { estado.personal = eleccion; } });
-    if (!visorVigilado) {
-      visorVigilado = true;
-      vigilarSacudida(visor, tirarPlatillo);
-      // iPhone necesita permiso para leer la sacudida: se pide la primera vez que tocan el platillo.
-      visor.addEventListener("pointerdown", pedirMovimiento, { once: true });
-    }
-  } else ref("visor", raiz).innerHTML = `<img src="${p.foto}" alt="">`;
-  raiz.querySelector('[data-accion="ver-en-mi-mesa"]').hidden = !conModelo;
-  raiz.querySelector(".pista-giro").hidden = !conModelo;
+  const archivos = archivosDe(p, estado.personal);
+  ponerFoto(archivos.foto);
+  // Las demás fotos del platillo se bajan de una vez para que el cambio sea instantáneo.
+  if (p.personalizar?.fotos) {
+    const n = p.personalizar.opciones.length;
+    for (let k = 0; k < 2 ** n; k++) new Image().src = p.personalizar.fotos.replace("{bits}", k.toString(2).padStart(n, "0"));
+  }
+  precargarAR(p, estado.personal);
+  raiz.querySelector('[data-accion="ver-en-mi-mesa"]').hidden = !archivos.glb;
   ref("aviso-ar", raiz).hidden = true;
+  pintarGusto();
 
   texto("nombre", p.nombre, raiz);
   texto("precio", dinero.format(p.precio), raiz);
@@ -314,7 +392,7 @@ function pintarParaQuien() {
   }));
 }
 
-function agregar({ desdeRA = false } = {}) {
+function agregar() {
   const raiz = pantalla("detalle");
   const otra = ref("otra-alergia", raiz).value.trim();
   const nombres = estado.alergias.map((id) => ALERGIAS.find((a) => a.id === id).nombre);
@@ -326,15 +404,9 @@ function agregar({ desdeRA = false } = {}) {
   estado.pedido.push({ id: estado.actual, cantidad: estado.cantidad, notas, para });
   const p = platillo(estado.actual);
   efecto("agregar");
-  if (!desdeRA) volarAlPedido(p.foto);
+  volarAlPedido(archivosDe(p, estado.personal).foto);
   avisar(`${p.nombre} se agregó a tu pedido`);
   guardar();
-}
-
-// Desde el banner de AR Quick Look (iPhone): "Agregar al pedido" sin salir de la cámara.
-function agregarDesdeRA() {
-  agregar({ desdeRA: true });
-  pintarBarra();
 }
 
 // La foto del platillo vuela hacia la barra del pedido.
@@ -359,37 +431,6 @@ function volarAlPedido(foto) {
   });
   // Con temporizador (no al terminar la animación): así sigue "dentro del toque" y el iPhone deja vibrar.
   setTimeout(() => efecto("llega"), 700);
-}
-
-// ---------- "Se cayó el platillo" ----------
-
-let detenerLluvia = null;
-function tirarPlatillo() {
-  const p = platillo(estado.actual);
-  const caida = ref("caida");
-  if (!p?.ingredientes || !caida.hidden || vistaActual() !== "detalle") return;
-  sentir("plate", [260, 80, 160, 80, 320], 0.8);
-  document.querySelector(".visor-3d")?.classList.add("cayendo");
-  texto("caida-nombre", p.nombre);
-  lista("ingredientes").replaceChildren(...p.ingredientes.map(([dibujo, nombre]) => {
-    const chip = copiar("ingrediente");
-    chip.innerHTML = icono(dibujo);
-    chip.append(nombre);
-    return chip;
-  }));
-  caida.hidden = false;
-  caida.classList.remove("con-tarjeta");
-  setTimeout(() => {
-    detenerLluvia = lluviaDeIngredientes(ref("lienzo-caida"), p.ingredientes.map(([e]) => e),
-      () => caida.classList.add("con-tarjeta"));
-  }, 350);
-}
-
-function cerrarCaida() {
-  detenerLluvia?.();
-  detenerLluvia = null;
-  ref("caida").hidden = true;
-  document.querySelector(".visor-3d")?.classList.remove("cayendo");
 }
 
 // ---------- 5. Pedido ----------
@@ -630,8 +671,12 @@ function pintarEfectivo(pago = aPagar()) {
   rango.max = opciones.length - 1;
   rango.value = estado.pagaCon;
   rango.style.setProperty("--avance", `${opciones.length > 1 ? (estado.pagaCon / (opciones.length - 1)) * 100 : 100}%`);
+  // Las marcas se pueden tocar: "Exacto", "$350"... llevan la barra a ese monto.
   lista("marcas-billete").replaceChildren(...opciones.map((v, i) => {
-    const m = document.createElement("span");
+    const m = document.createElement("button");
+    m.type = "button";
+    m.dataset.accion = "billete";
+    m.dataset.valor = i;
     m.textContent = i === 0 ? "Exacto" : `$${v}`;
     m.classList.toggle("activo", i === estado.pagaCon);
     return m;
@@ -639,14 +684,34 @@ function pintarEfectivo(pago = aPagar()) {
   const con = opciones[estado.pagaCon];
   const cambio = con - pago.total;
   texto("paga-con", estado.pagaCon === 0 ? "Exacto" : `$${con}`);
-  const piezas = desglosar(con);
-  ref("billetes").innerHTML = piezas.map((v, i) => `<span class="billete-pieza" style="--i:${i}">${v >= 20 ? billete(v) : monedaSvg(v)}</span>`).join("");
+  pintarBilletes(desglosar(con));
   ref("desglose").innerHTML = `
     <div><dt>Consumo</dt><dd>${dinero.format(pago.base)}</dd></div>
     <div><dt>Propina (${pago.pct}%)</dt><dd>${dinero.format(pago.propina)}</dd></div>
     <div class="fuerte"><dt>Total a dejar</dt><dd>${dinero.format(pago.total)}</dd></div>
     <div><dt>Pagas con</dt><dd>${dinero.format(con)}</dd></div>
     <div class="cambio"><dt>Te regresan</dt><dd>${dinero.format(Math.max(0, cambio))}</dd></div>`;
+}
+
+// Billetes y monedas dibujados. Solo cambian las piezas que son distintas: las que ya estaban se quedan quietas
+// y solo las nuevas entran animadas. (Antes se volvían a dibujar todas en cada movimiento de una barra: cada
+// vez reiniciaban su animación desde invisibles y, mientras la barra se movía, no se alcanzaba a ver ninguna.)
+function pintarBilletes(piezas) {
+  const caja = ref("billetes");
+  const actuales = [...caja.children];
+  let iguales = 0;
+  while (iguales < piezas.length && actuales[iguales]?.dataset.valor === String(piezas[iguales])) iguales++;
+  for (const sobrante of actuales.slice(iguales)) caja.removeChild(sobrante);
+  piezas.slice(iguales).forEach((v, k) => {
+    const el = document.createElement("span");
+    el.className = "billete-pieza nueva";
+    el.dataset.valor = v;
+    el.style.setProperty("--i", iguales + k);
+    el.style.setProperty("--n", Math.min(k, 5));
+    el.innerHTML = v >= 20 ? billete(v) : monedaSvg(v);
+    el.addEventListener("animationend", () => el.classList.remove("nueva"), { once: true });
+    caja.append(el);
+  });
 }
 
 // ---------- 9. Gracias ----------
@@ -798,7 +863,7 @@ function pintarBarra() {
 
 const acciones = {
   ir: (el) => ir(el.dataset.destino),
-  atras: () => history.back(),
+  atras: regresar,
   "grupo-solo": () => {
     estado.grupo = { personas: ["Tú"], modo: "iguales" };
     estado.personasIguales = 1;
@@ -829,9 +894,21 @@ const acciones = {
   "abrir-platillo": (el) => { efecto("abrir"); ir(`platillo/${el.dataset.id}`); },
   "ver-en-mi-mesa": () => {
     efecto("abrir");
-    const abierto = verEnMiMesa();
+    guardar(); // en iPhone la página puede recargarse al volver de la cámara
+    const abierto = verEnMiMesa(platillo(estado.actual), estado.personal);
     ref("aviso-ar").hidden = abierto;
-    if (abierto) avisar("Apunta a la mesa · pellizca para cambiar el tamaño", "girar");
+  },
+  gusto: (el) => {
+    const p = platillo(estado.actual);
+    const id = el.dataset.valor;
+    const lleva = !(estado.personal[id] ?? true);
+    estado.personal = { ...estado.personal, [id]: lleva };
+    efecto(lleva ? "poner" : "retirar");
+    pintarGusto();
+    ponerFoto(archivosDe(p, estado.personal).foto, true);
+    precargarAR(p, estado.personal);
+    reanimar(lista("gusto").querySelector(`[data-valor="${id}"]`), "cambia");
+    if (!ref("foto-sello").hidden) reanimar(ref("foto-sello"), "cambia");
   },
   mas: () => { estado.cantidad++; efecto("mas"); pintarCantidad(); },
   menos: () => { estado.cantidad = Math.max(1, estado.cantidad - 1); efecto("menos"); pintarCantidad(); },
@@ -876,6 +953,12 @@ const acciones = {
     l.para = l.para >= n - 1 ? -1 : l.para + 1; // Tú → amigos → "Entre todos" → Tú
     efecto("seleccion");
     pintarDivision();
+  },
+  billete: (el) => {
+    const valor = Number(el.dataset.valor);
+    if (valor !== estado.pagaCon) efecto("billete");
+    estado.pagaCon = valor;
+    pintarEfectivo();
   },
   "quien-paga": (el) => { estado.quienPaga = Number(el.dataset.valor); estado.pagaCon = 0; efecto("seleccion"); pintarDivision(); },
   pagar: () => {
@@ -926,7 +1009,6 @@ const acciones = {
     efecto("publicar");
     window.open(RESENA_GOOGLE, "_blank", "noopener");
   },
-  "volver-a-servir": () => { cerrarCaida(); reiniciarVisor(); efecto("abrir"); },
 };
 
 document.addEventListener("click", (evento) => {
@@ -961,8 +1043,54 @@ ref("form-persona").addEventListener("submit", (evento) => {
   guardar();
 });
 
-// Deslizador de propina: cualquier porcentaje de 0 a 30, con un clic por cada punto.
-// Deslizador de propina: cualquier porcentaje de 0 a 30 para quien paga ahora, con un clic por cada punto.
+// Barras (propina y billete). Se manejan con el dedo desde aquí y no con el control nativo: en el iPhone la barra
+// nativa solo responde si se agarra justo la bolita, no hace caso a un toque sobre la línea y se suelta sola
+// cuando la página cambia algo mientras se arrastra. Así responde en toda su zona, a un toque o arrastrando,
+// y deja pasar el desplazamiento vertical de la página.
+function hacerBarra(rango) {
+  const caja = rango.closest(".deslizador");
+  let dedo = null; // { id, x, y, activo }
+  const fijar = (x) => {
+    const r = rango.getBoundingClientRect();
+    const margen = 16; // radio de la bolita
+    const f = Math.max(0, Math.min(1, (x - r.left - margen) / Math.max(1, r.width - margen * 2)));
+    const min = Number(rango.min || 0);
+    const max = Number(rango.max || 100);
+    const valor = Math.round(min + f * (max - min));
+    if (valor === Number(rango.value)) return;
+    rango.value = valor;
+    rango.dispatchEvent(new Event("input", { bubbles: true }));
+  };
+  const soltar = () => { dedo = null; caja.classList.remove("agarrada"); };
+  const capturar = (e) => { try { caja.setPointerCapture(e.pointerId); } catch {} };
+  caja.addEventListener("pointerdown", (e) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    dedo = { id: e.pointerId, x: e.clientX, y: e.clientY, activo: e.pointerType === "mouse" };
+    caja.classList.add("agarrada");
+    if (dedo.activo) { capturar(e); fijar(e.clientX); }
+  });
+  caja.addEventListener("pointermove", (e) => {
+    if (!dedo || e.pointerId !== dedo.id) return;
+    if (!dedo.activo) {
+      const dx = Math.abs(e.clientX - dedo.x);
+      const dy = Math.abs(e.clientY - dedo.y);
+      if (dx < 4 && dy < 4) return;
+      if (dy > dx) return soltar(); // va hacia arriba o abajo: es desplazamiento de la página
+      dedo.activo = true;
+      capturar(e);
+    }
+    fijar(e.clientX);
+  });
+  caja.addEventListener("pointerup", (e) => {
+    if (dedo && e.pointerId === dedo.id) fijar(e.clientX); // un toque sin arrastrar también mueve la barra
+    soltar();
+  });
+  caja.addEventListener("pointercancel", soltar);
+}
+hacerBarra(ref("propina-rango"));
+hacerBarra(ref("billete-rango"));
+
+// Propina: cualquier porcentaje de 0 a 30 para quien paga ahora, con un clic por cada punto.
 ref("propina-rango").addEventListener("input", (evento) => {
   const valor = Number(evento.target.value);
   const pago = aPagar();
@@ -981,7 +1109,7 @@ ref("propina-rango").addEventListener("input", (evento) => {
 ref("billete-rango").addEventListener("input", (evento) => {
   const valor = Number(evento.target.value);
   if (valor !== estado.pagaCon) {
-    efecto("billete");
+    efecto("billete", true, { arrastre: true });
   }
   estado.pagaCon = valor;
   pintarEfectivo();
@@ -996,23 +1124,11 @@ ref("aviso").addEventListener("animationend", (evento) => {
 
 // ---------- Inicio ----------
 
-// Precarga en segundo plano: mientras corre la intro bajan las fotos; luego, sin estorbar, los modelos 3D.
-// Así el menú y el visor abren al instante (GitHub Pages deja los archivos en la caché del navegador).
+// Precarga en segundo plano: mientras corre la intro bajan las fotos del menú, para que abra al instante.
 function precargar() {
   for (const p of PLATILLOS) {
     for (const src of [p.miniatura, p.foto]) if (src) Object.assign(new Image(), { decoding: "async", src });
   }
-}
-
-// Los modelos 3D se bajan cuando el comensal ya está en el menú (no mientras otro 3D está cargando).
-let modelosPrecargados = false;
-function precargarModelos() {
-  if (modelosPrecargados) return;
-  modelosPrecargados = true;
-  const despues = window.requestIdleCallback ?? ((fn) => setTimeout(fn, 1200));
-  despues(() => {
-    for (const p of PLATILLOS) if (p.modelo) fetch(p.modelo, { priority: "low" }).catch(() => {});
-  }, { timeout: 3000 });
 }
 
 // Pone el dibujo SVG en cada elemento con data-icono="nombre" (ver js/iconos.js).
@@ -1026,15 +1142,17 @@ cargar();
 // Un estado guardado por la versión anterior no tiene calificaciones del chef.
 estado.calif ??= { mesero: null, chef: null, motivos: { mesero: [], chef: [] }, aspectos: {} };
 estado.propinas ??= {};
+estado.personal ??= {};
 prepararAudio();
 escucharDesbloqueo();
+prepararHapticos();
 precargar();
 pintarIconos();
 texto("mesa", estado.mesa ? `Mesa ${estado.mesa}` : "");
 iniciarFondo();
-window.addEventListener("hashchange", mostrar);
+window.addEventListener("popstate", mostrar);
 setInterval(revisarEtapa, 500);
 iniciarIntro({ mostrar: () => document.body.classList.add("listo"), mesa: estado.mesa ? `Mesa ${estado.mesa}` : "Bienvenido" });
 mostrar();
 // Panel de prueba de sonido y vibración: agregar ?prueba a la dirección.
-if (new URLSearchParams(location.search).has("prueba")) import("./prueba.js?v=202611121229").then((m) => m.abrirPrueba());
+if (new URLSearchParams(location.search).has("prueba")) import("./prueba.js?v=202611131102").then((m) => m.abrirPrueba());

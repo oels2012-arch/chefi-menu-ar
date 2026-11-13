@@ -1,7 +1,7 @@
 // Íconos de Chefi dibujados en SVG (la interfaz nunca usa emojis). Todos en una cuadrícula de 48 × 48.
 // - Los de interfaz llevan contorno carbón, como el resto del diseño.
 // - Los de alergias son "suaves": sin contorno duro, con el trazo en un tono más oscuro de su propio color.
-// - Los de ingredientes también se usan como sellos en el lienzo de "se cayó el platillo".
+// - Los de ingredientes se usan en los interruptores de "A tu gusto".
 
 const K = "#1F1F1F";
 const O = "#F26B1D";
@@ -234,6 +234,11 @@ const DIBUJOS = {
     <path d="M14 20.6l8-4" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/>`,
 };
 // Extras de "En mi mesa" y marcas de los botones.
+// Toque de entrada (intro): un punto con dos ondas, del color del texto.
+DIBUJOS.toque = `
+  <circle cx="24" cy="24" r="7" fill="currentColor"/>
+  <circle cx="24" cy="24" r="13" fill="none" stroke="currentColor" stroke-width="3" opacity=".7"/>
+  <circle cx="24" cy="24" r="20" fill="none" stroke="currentColor" stroke-width="2.4" opacity=".35"/>`;
 DIBUJOS.cereza = `
     <path d="M26 20c1-6 5-11 12-14" ${linea} stroke-width="2.4"/>
     <path d="M36 7.4c3-2 6.4-1.6 8 .6-2.6 2.6-6 2.8-8-.6z" ${con(G)}/>

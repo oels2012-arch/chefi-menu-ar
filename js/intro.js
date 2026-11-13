@@ -1,11 +1,14 @@
 // Intro: logo reveal de Chefi dibujado en vivo (SVG), con los mismos tiempos que ChaosLogo del video de Chefi
 // (Remotion, ~/AGENTE MOTION GRAPHICS/src/compositions/chefi/v8/Cap5.tsx). Las bolitas de colores vuelan en espiral,
 // se acomodan sobre la curva de la C, una línea las conecta, se funden en el trazo, cae el punto verde y aparece
-// "chefi". Arranca sola. El navegador no deja sonar ni vibrar hasta que el usuario toca la pantalla: si ya trae el
-// sonido permitido, suena desde el inicio; si no, en cuanto toca se activan el sonido y la vibración.
+// "chefi". SIEMPRE lleva sonido, sin botón para activarlo o apagarlo.
+// Los navegadores (el iPhone sobre todo) no dejan que una página suene hasta que el usuario la toca. Por eso:
+// - si el navegador ya permite el sonido, el logo reveal arranca solo y con sonido;
+// - si no, las bolitas flotan en espera con "Toca para entrar" y ese toque arranca el logo reveal con su sonido
+//   (y en iPhone da el golpe háptico, porque es un toque real).
 
-import { sonar, sonidoLogo, efecto, audioActivo, desbloquearAudio, vibrar } from "./sonido.js?v=202611121229";
-import { icono } from "./iconos.js?v=202611121229";
+import { sonar, sonidoLogo, efecto, audioActivo, desbloquearAudio, vibrar, ES_IOS } from "./sonido.js?v=202611131102";
+import { icono } from "./iconos.js?v=202611131102";
 
 const FPS = 30;
 const FIN = 150; // cuadro en que la experiencia entra (el render web duraba 156)
@@ -54,9 +57,11 @@ const LUGAR = Array.from({ length: N }, (_, i) => {
 });
 const ANG = Array.from({ length: N }, (_, i) => azar(`iw-a${i}`) * Math.PI * 2);
 const RAD = Array.from({ length: N }, (_, i) => 520 + azar(`iw-r${i}`) * 520);
+let deriva = 0; // cuadros que las bolitas llevan flotando en espera del toque
 function inicio(i, ff) {
   const propio = 1 - rp(ff, T0, T0 + 20, (t) => t);
-  return [Math.cos(ANG[i]) * RAD[i] + Math.sin(ff / 7 + i) * 16 * propio, Math.sin(ANG[i]) * RAD[i] + Math.cos(ff / 8 + i) * 16 * propio];
+  const d = ff + deriva;
+  return [Math.cos(ANG[i]) * RAD[i] + Math.sin(d / 7 + i) * 16 * propio, Math.sin(ANG[i]) * RAD[i] + Math.cos(d / 8 + i) * 16 * propio];
 }
 function posicion(i, ff) {
   const d = i * 0.7;
@@ -270,14 +275,14 @@ export function iniciarIntro({ mostrar, mesa }) {
   }
   document.body.classList.add("con-intro");
   const escena = armarEscena(intro, mesa);
-  const aviso = intro.querySelector("[data-accion-intro='sonido']");
-  aviso.insertAdjacentHTML("afterbegin", icono("sonido"));
+  const entrar = intro.querySelector("[data-accion-intro='entrar']");
+  entrar.insertAdjacentHTML("afterbegin", icono("toque"));
   const saltar = intro.querySelector("[data-accion-intro='saltar']");
+  const ESPERA = 26; // cuadro en que las bolitas flotan mientras se espera el toque
   let terminado = false;
-  let tocado = false;
+  let esperando = false;
   let arranque = null;
   let ultimo = -1;
-  let sonoLogo = false;
 
   // Escala la escena para que el logo completo quede centrado y nítido en cualquier pantalla.
   function acomodar() {
@@ -310,17 +315,14 @@ export function iniciarIntro({ mostrar, mesa }) {
   }
 
   function cuadro(ahora) {
-    if (terminado) return;
+    if (terminado || esperando) return;
     arranque ??= ahora;
     const f = ((ahora - arranque) / 1000) * FPS;
     for (const s of SFX) {
       if (s.at > ultimo && s.at <= f) {
-        // Ya tocaron: el audio puede estar arrancando; sonar() lo deja en espera y suena en cuanto arranque.
-        if (audioActivo() || tocado) {
-          sonar(s.s, s.v * GANANCIA);
-          if (s.golpe) { sonidoLogo(); sonoLogo = true; }
-        }
-        if (s.golpe) vibrar([120, 50, 280]); // golpe del logo (Android, si ya tocó la pantalla)
+        // sonar() deja el sonido en espera si el audio todavía está arrancando tras el toque.
+        sonar(s.s, s.v * GANANCIA);
+        if (s.golpe) { sonidoLogo(); vibrar([120, 50, 280]); } // la vibración del golpe solo la da Android
       }
     }
     ultimo = f;
@@ -330,18 +332,40 @@ export function iniciarIntro({ mostrar, mesa }) {
     requestAnimationFrame(cuadro);
   }
 
-  // Si el navegador no deja sonar sin un toque, se invita a tocar; el primer toque activa sonido y vibración.
-  setTimeout(() => !tocado && !audioActivo() && aviso.classList.add("visible"), 500);
-  const alTocar = () => {
-    if (tocado) return;
-    tocado = true;
+  // En espera del toque: las bolitas de colores flotan y late "Toca para entrar".
+  let inicioEspera = null;
+  function flotar(ahora) {
+    if (terminado || !esperando) return;
+    inicioEspera ??= ahora;
+    const t = ((ahora - inicioEspera) / 1000) * FPS;
+    const f = Math.min(t, ESPERA);
+    deriva = Math.max(0, t - ESPERA);
+    pintar(escena, f);
+    camara(f);
+    requestAnimationFrame(flotar);
+  }
+  function esperarToque() {
+    esperando = true;
+    intro.classList.add("espera");
+    if (ES_IOS) intro.dataset.haptico = ""; // el toque de entrada da el golpe háptico del iPhone
+    setTimeout(() => esperando && entrar.classList.add("visible"), 350);
+    requestAnimationFrame(flotar);
+  }
+  // El toque de entrada: activa el sonido y arranca el logo reveal desde donde flotaban las bolitas.
+  function alTocar() {
+    if (!esperando || terminado) return;
+    esperando = false;
+    intro.classList.remove("espera");
+    entrar.classList.remove("visible");
     desbloquearAudio();
-    // Dentro del toque: en iPhone es el único momento en que se puede vibrar, así que va el golpe fuerte del logo.
-    vibrar([120, 50, 280]);
-    // Si el golpe del logo ya pasó sin sonido, suena ahora (espera a que el audio arranque).
-    if (ultimo >= T0 + 54 && !sonoLogo) { sonar("logo", 0.8 * GANANCIA); sonidoLogo(); sonoLogo = true; }
-    aviso.classList.remove("visible");
-  };
+    vibrar([40]);
+    sonar("whooshlow", 0.5 * GANANCIA);
+    sonar("pop2", 0.3 * GANANCIA);
+    const desde = T0 - 6;
+    ultimo = desde;
+    arranque = performance.now() - (desde / FPS) * 1000;
+    requestAnimationFrame(cuadro);
+  }
   intro.addEventListener("click", alTocar);
   saltar.addEventListener("click", (e) => {
     e.stopPropagation();
@@ -359,6 +383,8 @@ export function iniciarIntro({ mostrar, mesa }) {
       setTimeout(terminar, 1400);
       return;
     }
-    requestAnimationFrame(cuadro);
+    // Con el sonido ya permitido arranca solo; si no, espera el toque de entrada para empezar con sonido.
+    if (audioActivo()) requestAnimationFrame(cuadro);
+    else esperarToque();
   });
 }

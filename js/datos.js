@@ -1,5 +1,6 @@
 // Datos del menú. Para agregar un platillo, copia un bloque y cambia sus valores.
 // Si un platillo no tiene modelo 3D, deja `modelo: null` y no se mostrará "Ver en mi mesa".
+// `personalizar` (opcional): ingredientes que se quitan o ponen; cada combinación lleva su foto y su modelo 3D.
 // Precios de ejemplo. Valores nutricionales aproximados de una porción de referencia.
 
 export const RESTAURANTE = "Chefi";
@@ -27,31 +28,17 @@ export const PLATILLOS = [
     carbohidratos: "95 g",
     carne: "120 g",
     contiene: "Gluten, lácteos",
-    ingredientes: [["pan","Pan brioche"],["carne","Carne de res"],["queso","Queso cheddar"],["tocino","Tocino"],["cebolla","Aros de cebolla"],["lechuga","Lechuga"],["jitomate","Jitomate"],["papas","Papas"]],
-    // "En mi mesa": ingredientes que se pueden quitar o poner sobre el modelo 3D (ver js/mesa.js y herramientas/capas.py).
-    // El orden de las opciones es el de los bits del archivo de AR para iPhone (modelos/variantes/<platillo>_<bits>.usdz,
-    // hechos con herramientas/ar_iphone.py: traen placas 3D para quitar y poner el ingrediente dentro de la cámara).
+        // Ingredientes que el comensal puede quitar o poner. Cada combinación tiene su foto y su modelo 3D propios
+    // (hechos con IA a partir de la foto original; ver herramientas/variantes.py). {bits} = un 1 o un 0 por opción,
+    // en este orden (1 = lo lleva). `incluido` es como sale de cocina si no se cambia nada.
     personalizar: {
-      modelo: "modelos/capas/hamburguesa.glb",
-      variantes: "modelos/variantes/hamburguesa_{bits}.usdz",
+      fotos: "img/variantes/hamburguesa_{bits}.webp",
+      modelos: "modelos/variantes/hamburguesa_{bits}.glb",
+      modelosIOS: "modelos/variantes/hamburguesa_{bits}.usdz",
       opciones: [
-        { id: "lechuga", nombre: "Lechuga", icono: "lechuga", incluido: true, tipo: "anillo" },
-        { id: "jitomate", nombre: "Jitomate", icono: "jitomate", incluido: false, tipo: "capa" },
-        { id: "carne", nombre: "Doble carne", sin: "Carne sencilla", icono: "carne", incluido: true, tipo: "anillo" },
-        { id: "queso", nombre: "Queso extra", icono: "queso", incluido: false, tipo: "capa" },
+        { id: "lechuga", nombre: "Lechuga", icono: "lechuga", incluido: true },
+        { id: "jitomate", nombre: "Jitomate", icono: "jitomate", incluido: false },
       ],
-      // Cómo se acomoda la hamburguesa escaneada al cambiar un ingrediente. Mismas medidas (metros) que
-      // herramientas/lechuga.py. "quita": al quitarlo, lo de arriba baja el alto de su banda. "pone": pieza
-      // dibujada que entra a esa altura y levanta lo de arriba su grosor.
-      asentar: {
-        centro: [0.006, 0.04], radio: [0.058, 0.066], frente: [-0.012, 0], alto: [0.08, 0.09],
-        pasos: [
-          { id: "lechuga", quita: [0.029, 0.042] },
-          { id: "jitomate", pone: 0.042, alto: 0.0072 },
-          { id: "carne", quita: [0.042, 0.058] },
-          { id: "queso", pone: 0.058, alto: 0.0034 },
-        ],
-      },
     },
   },
   {
@@ -70,18 +57,18 @@ export const PLATILLOS = [
     carbohidratos: "70 g",
     carne: "80 g",
     contiene: "Gluten, lácteos",
-    ingredientes: [["spaghetti","Spaghetti"],["carne","Res molida"],["salsa","Salsa de jitomate"],["ajo","Ajo"],["parmesano","Parmesano"],["albahaca","Albahaca"]],
     personalizar: {
-      modelo: "modelos/capas/pasta.glb",
-      variantes: "modelos/variantes/pasta_{bits}.usdz",
-      opciones: [{ id: "parmesano", nombre: "Parmesano", icono: "parmesano", incluido: false, tipo: "lluvia" }],
+      fotos: "img/variantes/pasta_{bits}.webp",
+      modelos: "modelos/variantes/pasta_{bits}.glb",
+      modelosIOS: "modelos/variantes/pasta_{bits}.usdz",
+      opciones: [{ id: "parmesano", nombre: "Parmesano", icono: "parmesano", incluido: true }],
     },
   },
   {
     id: "ensalada",
     categoria: "ensaladas",
     nombre: "Ensalada fresca",
-    descripcion: "Mezcla de lechugas, jitomate cherry, pepino, aguacate y vinagreta de la casa.",
+    descripcion: "Mezcla de lechugas, jitomate cherry, pepino, aguacate, crotones y vinagreta de la casa.",
     precio: 129,
     foto: "img/ensalada.webp",
     miniatura: "img/ensalada_chica.webp",
@@ -92,12 +79,12 @@ export const PLATILLOS = [
     kcal: 220,
     carbohidratos: "15 g",
     carne: "Sin carne",
-    contiene: "Sin alérgenos comunes",
-    ingredientes: [["lechuga","Lechugas"],["tomate","Jitomate cherry"],["pepino","Pepino"],["aguacate","Aguacate"],["aceituna","Vinagreta de oliva"]],
+    contiene: "Gluten (crotones)",
     personalizar: {
-      modelo: "modelos/capas/ensalada.glb",
-      variantes: "modelos/variantes/ensalada_{bits}.usdz",
-      opciones: [{ id: "crotones", nombre: "Crotones", icono: "crotones", incluido: false, tipo: "lluvia" }],
+      fotos: "img/variantes/ensalada_{bits}.webp",
+      modelos: "modelos/variantes/ensalada_{bits}.glb",
+      modelosIOS: "modelos/variantes/ensalada_{bits}.usdz",
+      opciones: [{ id: "crotones", nombre: "Crotones", icono: "crotones", incluido: true }],
     },
   },
   {
@@ -116,11 +103,11 @@ export const PLATILLOS = [
     carbohidratos: "55 g",
     carne: "Sin carne",
     contiene: "Gluten, lácteos, huevo",
-    ingredientes: [["chocolate","Chocolate"],["harina","Harina"],["huevo-entero","Huevo"],["mantequilla","Mantequilla"],["leche","Leche"]],
     personalizar: {
-      modelo: "modelos/capas/pastel.glb",
-      variantes: "modelos/variantes/pastel_{bits}.usdz",
-      opciones: [{ id: "cereza", nombre: "Cereza", icono: "cereza", incluido: false, tipo: "posar" }],
+      fotos: "img/variantes/pastel_{bits}.webp",
+      modelos: "modelos/variantes/pastel_{bits}.glb",
+      modelosIOS: "modelos/variantes/pastel_{bits}.usdz",
+      opciones: [{ id: "cereza", nombre: "Cereza", icono: "cereza", incluido: false }],
     },
   },
 ];

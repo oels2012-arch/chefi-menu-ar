@@ -1,6 +1,8 @@
 // Prueba en la Mac de los archivos de AR para iPhone, con el mismo motor de Apple (RealityKit).
 // Compilar:  swiftc -O herramientas/toca.swift -o /tmp/toca
-// Uso: /tmp/toca <archivo.usdz> <carpeta de salida> <nombre de placa a tocar>...   ("-" = solo esperar)
+// Uso: /tmp/toca <archivo.usdz> <carpeta de salida> <paso>...
+//   paso = nombre de una pieza a tocar, "-" (solo esperar) o "@grados" (girar el modelo para verlo por otro lado)
+//   p. ej. /tmp/toca modelos/variantes/hamburguesa_11.usdz /tmp/fotos @90 @180 @270
 //   p. ej. /tmp/toca modelos/variantes/hamburguesa_1010.usdz /tmp/fotos Placa_lechuga_1010 Placa_carne_0010
 // La pantalla de la Mac debe estar encendida (caffeinate -u -d), si no, no toma fotos.
 // Carga el USDZ en RealityKit (sin cámara), simula clics sobre las placas y guarda una foto tras cada uno.
@@ -48,7 +50,11 @@ final class Delegado: NSObject, NSApplicationDelegate {
         try? await Task.sleep(nanoseconds: 2_500_000_000)
         await foto("0_inicio")
         for (i, nombre) in toques.enumerated() {
-            if nombre != "-" {
+            if nombre.hasPrefix("@") {
+                // "@120" gira el modelo 120° sobre el eje vertical, para verlo por otro lado.
+                let grados = Float(nombre.dropFirst()) ?? 0
+                raiz.transform.rotation = simd_quatf(angle: grados * .pi / 180, axis: [0, 1, 0])
+            } else if nombre != "-" {
                 guard let e = raiz.findEntity(named: nombre) else { print("no existe", nombre); continue }
                 let caja = e.visualBounds(relativeTo: nil)
                 guard let p = vista.project(caja.center) else { print("fuera de vista", nombre); continue }

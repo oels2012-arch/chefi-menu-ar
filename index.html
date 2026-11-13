@@ -11,10 +11,8 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;900&family=Inter+Tight:wght@400;500;600;700;800&family=Fredoka:wght@500;600&display=swap">
   <link rel="icon" href="img/icono.svg" type="image/svg+xml">
   <link rel="preload" href="img/hero_hamburguesa.webp" as="image" type="image/webp" fetchpriority="high">
-  <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="css/estilos.css?v=202611121229">
-  <script type="module" src="https://cdn.jsdelivr.net/npm/@google/model-viewer@3.5.0/dist/model-viewer.min.js"></script>
-  <script type="module" src="js/app.js?v=202611121229"></script>
+  <link rel="stylesheet" href="css/estilos.css?v=202611131102">
+  <script type="module" src="js/app.js?v=202611131102"></script>
 </head>
 <body>
   <!--
@@ -29,9 +27,10 @@
     <div class="particulas"></div>
   </div>
 
-  <!-- Intro: logo reveal de Chefi dibujado en vivo (js/intro.js). Arranca solo; el primer toque activa sonido y vibración -->
+  <!-- Intro: logo reveal de Chefi dibujado en vivo (js/intro.js), siempre con sonido. Si el navegador exige un toque
+       para sonar (iPhone), espera con "Toca para entrar" y ese toque lo arranca con sonido y vibración -->
   <div class="intro" data-ref="intro">
-    <button class="intro-sonido" data-accion-intro="sonido"><span>Toca para activar el sonido</span></button>
+    <button class="intro-entrar" data-accion-intro="entrar"><span>Toca para entrar</span></button>
     <button class="intro-saltar" data-accion-intro="saltar">Saltar</button>
   </div>
 
@@ -96,7 +95,7 @@
             <g class="fila f3"><circle cx="46" cy="90" r="8"/><rect x="58" y="86" width="24" height="8" rx="4"/></g>
             <circle class="dedo" cx="70" cy="60" r="9"/>
           </svg>
-          <div><b>2</b><h3>Elige tu platillo</h3><p>Ábrelo y gíralo en 3D para verlo por todos lados.</p></div>
+          <div><b>2</b><h3>Elige tu platillo</h3><p>Ábrelo, mira su foto y quita o pon ingredientes a tu gusto.</p></div>
         </li>
         <li class="paso">
           <svg class="grafico g-mesa" viewBox="0 0 120 120" aria-hidden="true">
@@ -183,14 +182,20 @@
     <!-- 4. Detalle del platillo + experiencia inmersiva -->
     <section class="pantalla" data-pantalla="detalle">
       <div class="escenario">
-        <div class="contenedor-visor" data-ref="visor"></div>
-        <span class="pista-giro"><span data-icono="girar"></span>Gíralo · sacúdelo y se cae</span>
+        <div class="foto-platillo" data-ref="foto-platillo"></div>
+        <span class="foto-sello" data-ref="foto-sello" hidden><i data-icono="check"></i><span data-ref="foto-sello-texto"></span></span>
+      </div>
+
+      <!-- A tu gusto: quitar o poner ingredientes cambia la foto (y el modelo 3D de "Ver en mi mesa") -->
+      <div class="a-tu-gusto" data-ref="a-tu-gusto" hidden>
+        <p class="rotulo">A tu gusto</p>
+        <div class="gusto-lista" data-lista="gusto"></div>
       </div>
 
       <!-- Función extra: abre la cámara y pone el platillo a escala real sobre la mesa -->
       <button class="boton-ar" data-accion="ver-en-mi-mesa">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 3 7v10l9 5 9-5V7l-9-5Zm0 2.3 6.6 3.7L12 11.7 5.4 8 12 4.3ZM5 9.7l6 3.4v6.6l-6-3.4V9.7Zm8 10v-6.6l6-3.4v6.6l-6 3.4Z"/></svg>
-        <span>Ver en mi mesa<small>Tamaño real · con su info nutricional</small></span>
+        <span>Ver en mi mesa<small data-ref="ar-detalle">En 3D y a tamaño real</small></span>
       </button>
       <p class="aviso-ar" data-ref="aviso-ar" hidden>Abre este menú en tu celular para ver el platillo sobre tu mesa.</p>
 
@@ -341,7 +346,7 @@
         <div class="deslizador">
           <input type="range" min="0" max="3" step="1" data-ref="billete-rango" aria-label="Billete con el que pagas">
         </div>
-        <div class="marcas" data-lista="marcas-billete" aria-hidden="true"></div>
+        <div class="marcas" data-lista="marcas-billete"></div>
         <dl class="desglose" data-ref="desglose"></dl>
       </div>
 
@@ -421,17 +426,6 @@
   <!-- Aviso breve -->
   <div class="aviso-flotante" data-ref="aviso" role="status" hidden></div>
 
-  <!-- "Se cayó el platillo": la pantalla se llena de ingredientes -->
-  <div class="caida" data-ref="caida" hidden>
-    <canvas data-ref="lienzo-caida"></canvas>
-    <div class="caida-tarjeta">
-      <h3>¡Uy, se te cayó!</h3>
-      <p>Esto es lo que lleva tu <strong data-ref="caida-nombre"></strong>:</p>
-      <div class="opciones envolver" data-lista="ingredientes"></div>
-      <button class="boton-principal" data-accion="volver-a-servir">Volver a servir</button>
-    </div>
-  </div>
-
   <!-- Plantillas que app.js copia para cada elemento de una lista -->
   <template data-plantilla="categoria">
     <button class="chip" data-accion="categoria"></button>
@@ -485,8 +479,12 @@
     </button>
   </template>
 
-  <template data-plantilla="ingrediente">
-    <span class="chip chip-fijo"></span>
+  <template data-plantilla="gusto">
+    <button class="gusto" data-accion="gusto" aria-pressed="false">
+      <span class="gusto-icono"></span>
+      <span class="gusto-texto"><strong class="gusto-nombre"></strong><small class="gusto-estado"></small></span>
+      <span class="gusto-palanca" aria-hidden="true"><i></i></span>
+    </button>
   </template>
 </body>
 </html>

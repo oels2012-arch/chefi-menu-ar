@@ -123,19 +123,26 @@ a { color: inherit; }
   position: absolute; left: 50%; opacity: 0; padding: .3em 1em; border-radius: 999px; white-space: nowrap;
   background: var(--carbon); color: var(--crema); font: 700 1em var(--texto); letter-spacing: .14em; text-transform: uppercase;
 }
-.intro-sonido {
-  position: absolute; left: 50%; bottom: calc(28px + var(--abajo)); display: flex; align-items: center; gap: 10px;
-  padding: 10px 18px 10px 12px; border-radius: 999px; border: 1.5px solid var(--linea); background: #ffffffcc;
-  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); color: var(--carbon); font-weight: 600; font-size: .86rem; white-space: nowrap;
-  opacity: 0; transform: translate(-50%, 12px); transition: opacity .4s, transform .5s var(--resorte); pointer-events: none;
+/* "Toca para entrar": en iPhone el sonido solo puede empezar con un toque, así que el logo reveal arranca con él. */
+.intro-entrar {
+  position: absolute; left: 50%; bottom: calc(64px + var(--abajo)); display: flex; align-items: center; gap: 10px;
+  padding: 14px 24px 14px 16px; border-radius: 999px; border: var(--borde); background: var(--naranja); color: var(--blanco);
+  box-shadow: var(--sombra-dura); font: 700 1rem var(--titulo); white-space: nowrap;
+  opacity: 0; transform: translate(-50%, 16px); transition: opacity .4s, transform .5s var(--resorte); pointer-events: none;
 }
-.intro-sonido.visible { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
-.intro-sonido .ico { width: 22px; height: 22px; color: var(--naranja); animation: latir-sonido 1.6s ease-in-out infinite; }
-@keyframes latir-sonido { 50% { transform: scale(1.15); } }
+.intro-entrar.visible { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+.intro-entrar .ico { width: 24px; height: 24px; animation: latir-entrar 1.6s ease-in-out infinite; }
+@keyframes latir-entrar { 50% { transform: scale(1.18); } }
+.intro.espera { cursor: pointer; }
 .intro-saltar {
   position: absolute; right: 16px; top: calc(14px + var(--arriba)); padding: 8px 14px; border-radius: 999px;
   border: 1.5px solid var(--linea); background: #ffffffaa; font-weight: 600; font-size: .85rem;
 }
+
+/* Vibración en iPhone (js/sonido.js > prepararHapticos): etiqueta transparente sobre cada botón, ligada a un
+   interruptor oculto. El dedo la toca y el iPhone da su golpe háptico. */
+.hap { position: absolute; inset: 0; z-index: 3; margin: 0; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.hap > input { position: absolute; left: 0; top: 0; width: 1px; height: 1px; margin: 0; visibility: hidden; }
 
 /* Íconos SVG (js/iconos.js) */
 .ico { display: block; width: 100%; height: 100%; overflow: visible; }
@@ -481,82 +488,55 @@ button, .tarjeta, .metodos label { position: relative; overflow: hidden; }
 
 /* ================= 4. Detalle + experiencia inmersiva ================= */
 .escenario { position: relative; margin: -14px -16px 0; border-bottom: var(--borde); }
-.contenedor-visor {
-  background:
-    radial-gradient(55% 40% at 50% 66%, #ffffffee 0%, transparent 70%),
-    repeating-radial-gradient(ellipse 120% 60% at 50% 70%, var(--crema-2) 0 26px, var(--papel) 26px 52px);
-  overflow: hidden;
+/* Foto del platillo. Al quitar o poner un ingrediente, la foto de esa combinación entra encima de la anterior. */
+.foto-platillo {
+  position: relative; height: min(50vh, 400px); min-height: 260px; overflow: hidden;
+  background: #fff; /* las fotos traen fondo blanco: así el plato se funde con la pantalla */
 }
-.visor-3d, .contenedor-visor img {
-  width: 100%; height: min(54vh, 430px); min-height: 280px; display: block; object-fit: cover;
-  --poster-color: transparent;
+.foto-platillo img {
+  position: absolute; inset: 0; width: 100%; height: 100%; display: block; object-fit: contain; padding: 6px 10px 2px;
+  opacity: 0; transform: scale(.94); transition: opacity .32s ease, transform .5s var(--resorte);
 }
-.visor-3d.cayendo { animation: caer .7s cubic-bezier(.6, 0, .9, .5) forwards; }
-@keyframes caer { 30% { transform: rotate(-6deg) translateY(-10px); } 100% { transform: rotate(28deg) translateY(110%); opacity: 0; } }
-.pista-giro {
-  position: absolute; left: 12px; top: 12px; display: flex; align-items: center; gap: 6px; padding: 4px 12px 4px 6px;
-  border-radius: 999px; background: var(--carbon); color: var(--crema); font-size: .74rem; font-weight: 500; pointer-events: none;
+.foto-platillo img.visible { opacity: 1; transform: none; }
+.foto-platillo img.sale { opacity: 0; transform: scale(1.03); transition: opacity .28s ease .08s, transform .3s ease; }
+.foto-sello {
+  position: absolute; left: 12px; top: 12px; display: flex; align-items: center; gap: 6px; padding: 5px 12px 5px 6px;
+  border-radius: 999px; background: var(--carbon); color: var(--crema); font-size: .74rem; font-weight: 600; pointer-events: none;
 }
-.pista-giro [data-icono] { width: 22px; height: 22px; animation: girar-pista 3.2s ease-in-out infinite; }
-@keyframes girar-pista { 0%, 55%, 100% { transform: rotate(0); } 70% { transform: rotate(-14deg); } 85% { transform: rotate(10deg); } }
-/* Arma tu platillo: botones de ingredientes sobre el visor 3D (js/mesa.js). Van dentro de <model-viewer>
-   para que en Android sigan visibles con la cámara de realidad aumentada abierta. */
-.arma { position: absolute; right: 12px; bottom: 48px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; pointer-events: none; }
-.arma[hidden] { display: none; }
-.arma-chip {
-  pointer-events: auto; touch-action: manipulation; display: flex; align-items: center; gap: 7px; min-height: 44px; padding: 4px 6px 4px 4px;
-  border: 2px solid #1f1f1f33; border-radius: 999px; background: #fff6ecd9; color: var(--gris);
-  font: 600 .8rem/1 "Fredoka", var(--texto); white-space: nowrap;
-  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
-  transition: background .3s, border-color .3s, color .3s, box-shadow .3s, transform .25s var(--resorte);
-}
-.arma-chip:active { transform: scale(.94); }
-.arma-icono { flex: none; width: 32px; height: 32px; padding: 3px; border-radius: 50%; background: #ffffffa6; filter: grayscale(.9); opacity: .55; transition: filter .35s, opacity .35s, background .35s; }
-.arma-icono svg { width: 100%; height: 100%; display: block; }
-.arma-nombre small { font: inherit; }
-.arma-marca { flex: none; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--naranja); color: #fff; transition: background .3s; }
-.arma-marca svg { grid-area: 1 / 1; width: 13px; height: 13px; transition: transform .35s var(--resorte), opacity .2s; }
-.arma-marca svg:first-child { transform: scale(0) rotate(-40deg); opacity: 0; }
-.arma-chip.activo { border-color: var(--carbon); background: var(--blanco); color: var(--carbon); box-shadow: 3px 3px 0 var(--naranja); }
-.arma-chip.activo .arma-icono { filter: none; opacity: 1; background: var(--crema); }
-.arma-chip.activo .arma-marca { background: var(--verde); }
-.arma-chip.activo .arma-marca svg:first-child { transform: none; opacity: 1; }
-.arma-chip.activo .arma-marca svg:last-child { transform: scale(0) rotate(40deg); opacity: 0; }
-.arma-chip.cambia { animation: rebote .45s var(--resorte); }
-.arma-chip.cambia .arma-icono { animation: arma-salta .5s var(--resorte); }
-@keyframes arma-salta { 35% { transform: translateY(-6px) rotate(-10deg) scale(1.1); } }
-/* Con dos o más ingredientes: en fila bajo el platillo, cada uno con su icono y su nombre */
-.arma.varios { left: 8px; right: 8px; bottom: 44px; flex-direction: row; justify-content: center; align-items: stretch; gap: 6px; }
-.arma.varios .arma-chip {
-  position: relative; flex: 0 1 82px; min-width: 0; min-height: 0; flex-direction: column; justify-content: center; gap: 3px; padding: 6px 2px 5px;
-  border-radius: 16px; font-size: .64rem; line-height: 1.05; white-space: normal; text-align: center;
-}
-.arma.varios .arma-chip.activo { box-shadow: 2px 2px 0 var(--naranja); }
-.arma.varios .arma-icono { width: 28px; height: 28px; }
-.arma.varios .arma-marca { position: absolute; right: 3px; top: 3px; width: 16px; height: 16px; }
-.arma.varios .arma-marca svg { width: 9px; height: 9px; }
-/* Con la cámara abierta (Android): abajo y al centro, más grandes */
-model-viewer[ar-status="session-started"] .arma { left: 0; right: 0; bottom: calc(28px + env(safe-area-inset-bottom)); flex-direction: row; justify-content: center; }
-model-viewer[ar-status="session-started"] .arma-chip { min-height: 52px; padding-right: 10px; font-size: .92rem; }
-model-viewer[ar-status="session-started"] .arma.varios .arma-chip { flex-basis: 86px; min-height: 0; padding: 8px 2px 6px; font-size: .7rem; }
+.foto-sello[hidden] { display: none; }
+.foto-sello i { width: 18px; height: 18px; border-radius: 50%; background: var(--verde); display: grid; place-items: center; }
+.foto-sello i svg { width: 12px; height: 12px; color: #fff; }
+.foto-sello.cambia { animation: rebote .45s var(--resorte); }
 
-/* Etiqueta nutricional dentro de la cámara (Android WebXR); en la vista 3D normal no se muestra */
-.etiqueta-ra { display: none; }
-model-viewer[ar-status="session-started"] .etiqueta-ra {
-  display: grid; gap: 4px; min-width: 170px; padding: 12px 14px; border-radius: 18px; text-align: left;
-  background: #fff6ecf0; color: var(--carbon); border: 2px solid var(--carbon); box-shadow: 4px 4px 0 var(--naranja);
-  font: 500 12px var(--texto); transform: translate(10px, -50%);
+/* A tu gusto: un interruptor por ingrediente. Cambia la foto y el modelo que se ve en la mesa. */
+.a-tu-gusto { margin: 14px 0 0; }
+.a-tu-gusto[hidden] { display: none; }
+.a-tu-gusto .rotulo { margin-bottom: 8px; }
+.gusto-lista { display: grid; gap: 8px; }
+.gusto {
+  display: flex; align-items: center; gap: 10px; min-height: 60px; padding: 8px 12px 8px 8px; text-align: left;
+  border-radius: 18px; border: var(--borde); background: var(--blanco); color: var(--carbon);
+  transition: background .25s, box-shadow .2s, transform .15s var(--resorte);
 }
-.etiqueta-ra strong { font: 700 13px var(--titulo); }
-.etiqueta-ra-precio { color: var(--naranja); font-weight: 800; }
-.etiqueta-ra dl { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 10px; margin: 4px 0; }
-.etiqueta-ra dt { font-size: 10px; color: var(--gris); text-transform: uppercase; }
-.etiqueta-ra dd { margin: 0; font-weight: 700; }
-.etiqueta-ra small { color: var(--naranja-oscuro); font-weight: 700; }
+.gusto:active { transform: scale(.97); }
+.gusto-icono { flex: none; width: 42px; height: 42px; padding: 5px; border-radius: 14px; background: var(--crema-2); filter: grayscale(.9); opacity: .6; transition: filter .3s, opacity .3s, transform .35s var(--resorte); }
+.gusto-icono svg { width: 100%; height: 100%; display: block; }
+.gusto-texto { display: grid; min-width: 0; flex: 1; }
+.gusto-nombre { font: 700 .92rem var(--titulo); letter-spacing: -.01em; }
+.gusto-estado { font-size: .76rem; color: var(--gris); font-weight: 600; }
+.gusto-palanca { flex: none; position: relative; width: 40px; height: 24px; border-radius: 99px; border: 2px solid var(--carbon); background: var(--crema-2); transition: background .25s; }
+.gusto-palanca i { position: absolute; left: 2px; top: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--carbon); transition: transform .3s var(--resorte), background .25s; }
+.gusto.activo { background: #fff1e6; box-shadow: 3px 3px 0 var(--naranja); }
+.gusto.activo .gusto-icono { filter: none; opacity: 1; background: var(--crema); }
+.gusto.activo .gusto-estado { color: var(--verde); }
+.gusto.activo .gusto-palanca { background: var(--verde); }
+.gusto.activo .gusto-palanca i { transform: translateX(16px); background: var(--blanco); }
+.gusto.cambia .gusto-icono { animation: gusto-salta .5s var(--resorte); }
+@keyframes gusto-salta { 35% { transform: translateY(-6px) rotate(-10deg) scale(1.1); } }
 
 .boton-ar {
   position: relative; z-index: 2; display: flex; align-items: center; gap: 14px; width: 100%;
-  margin: -34px 0 20px; padding: 10px 18px 10px 10px; min-height: 70px;
+  margin: 14px 0 20px; padding: 10px 18px 10px 10px; min-height: 70px;
   border: var(--borde); border-radius: 24px; text-align: left;
   background: var(--carbon); color: var(--crema); box-shadow: 4px 4px 0 var(--naranja);
   transition: transform .12s, box-shadow .12s;
@@ -735,7 +715,9 @@ model-viewer[ar-status="session-started"] .etiqueta-ra {
 .control-encabezado { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
 .control-encabezado .rotulo, .control-encabezado p { margin: 0; }
 .valor-propina { min-width: 80px; text-align: center; padding: 4px 12px; border-radius: 999px; background: var(--naranja); color: var(--blanco); border: var(--borde); font: 700 1rem var(--titulo); }
-.deslizador { padding: 8px 0; }
+.deslizador { padding: 10px 0; touch-action: pan-y; cursor: pointer; -webkit-user-select: none; user-select: none; }
+.deslizador input { pointer-events: none; } /* la mueve hacerBarra() de app.js */
+.deslizador.agarrada input::-webkit-slider-thumb { transform: scale(1.15); background: var(--naranja); }
 .deslizador input {
   -webkit-appearance: none; appearance: none; width: 100%; height: 14px; margin: 0; border-radius: 999px;
   background: linear-gradient(90deg, var(--naranja) var(--avance, 50%), var(--crema-2) var(--avance, 50%));
@@ -912,27 +894,15 @@ model-viewer[ar-status="session-started"] .etiqueta-ra {
 @keyframes aviso-entra { from { transform: translate(-50%, -30px) scale(.9); opacity: 0; } }
 @keyframes aviso-sale { to { transform: translate(-50%, -30px); opacity: 0; } }
 
-/* ---------- Se cayó el platillo ---------- */
-.caida { position: fixed; inset: 0; z-index: 50; background: #1f1f1f40; }
-.caida canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
-.caida-tarjeta {
-  position: absolute; left: 16px; right: 16px; bottom: calc(20px + var(--abajo)); max-width: 520px; margin: 0 auto; padding: 20px;
-  border-radius: 24px; background: var(--crema); border: var(--borde); box-shadow: var(--sombra-dura);
-  opacity: 0; transform: translateY(40px) scale(.95); pointer-events: none; transition: opacity .3s, transform .45s var(--resorte);
-}
-.caida.con-tarjeta .caida-tarjeta { opacity: 1; transform: none; pointer-events: auto; }
-.caida-tarjeta h3 { font-size: 1.4rem; color: var(--naranja); }
-.caida-tarjeta .boton-principal { margin-bottom: 0; }
-
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
   .paso { opacity: 1; transform: none; }
   .palabra > span { animation: none; }
 }
 
-/* Pantallas bajas: el visor 3D se encoge para que se vea el botón "Ver en mi mesa" */
+/* Pantallas bajas: la foto se encoge para que se vean los ingredientes y el botón "Ver en mi mesa" */
 @media (max-height: 700px) {
-  .visor-3d, .contenedor-visor img { height: 46vh; min-height: 240px; }
+  .foto-platillo { height: 40vh; min-height: 220px; }
 }
 
 /* Celulares angostos (iPhone SE y similares) */
@@ -965,16 +935,16 @@ model-viewer[ar-status="session-started"] .etiqueta-ra {
 .aviso-terminal [data-icono] { flex: none; width: 48px; height: 48px; padding: 4px; border-radius: 14px; background: var(--crema); }
 .valor-propina.verde { background: var(--verde); }
 .billetes { position: relative; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 4px 0; min-height: 66px; margin: 4px 0 8px; padding: 6px 10px; border-radius: 16px; background: var(--crema-2); }
-.billete-pieza { display: block; margin-left: -18px; animation: billete-entra .45s var(--resorte) both; animation-delay: calc(var(--i) * 50ms); }
+.billete-pieza { display: block; margin-left: -18px; }
+.billete-pieza.nueva { animation: billete-entra .4s var(--resorte) backwards; animation-delay: calc(var(--n, 0) * 45ms); }
 .billete-pieza:first-child { margin-left: 0; }
 .billete-pieza .billete-svg { width: 96px; height: 48px; filter: drop-shadow(0 3px 4px #6e625940); transform: rotate(calc((var(--i) - 1) * 4deg)); }
 .billete-pieza .moneda-svg { width: 34px; height: 34px; margin-left: 12px; }
 @keyframes billete-entra { from { opacity: 0; transform: translateY(-16px) rotate(-8deg) scale(.9); } }
 [data-ref="billete-rango"] { background: linear-gradient(90deg, var(--verde) var(--avance, 0%), var(--crema-2) var(--avance, 0%)) !important; }
-[data-lista="marcas-billete"] span { flex: 1; text-align: center; }
-[data-lista="marcas-billete"] span:first-child { text-align: left; }
-[data-lista="marcas-billete"] span:last-child { text-align: right; }
-[data-lista="marcas-billete"] span.activo { color: var(--carbon); }
+[data-lista="marcas-billete"] { margin: 0 -4px 8px; }
+[data-lista="marcas-billete"] button { flex: 1; min-height: 40px; padding: 4px 2px; border: 0; border-radius: 12px; background: none; font: inherit; color: inherit; text-align: center; }
+[data-lista="marcas-billete"] button.activo { color: var(--carbon); background: var(--crema-2); }
 .desglose { display: grid; gap: 0; margin: 6px 0 0; }
 .desglose div { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1.5px dashed var(--linea); font-size: .9rem; }
 .desglose div:last-child { border-bottom: 0; }
